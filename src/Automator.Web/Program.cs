@@ -7,6 +7,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
+builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
+builder.Services.AddHostedService<SchedulerBackgroundService>();
 
 var app = builder.Build();
 

@@ -1,0 +1,337 @@
+@page "/jobs"
+@rendermode InteractiveServer
+@inject IJobSchedulerService Scheduler
+@inject IScriptRunnerService ScriptService
+@inject NavigationManager Nav
+
+<PageTitle>Scheduled Jobs - Automator</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h4 class="mb-0">Scheduled Jobs</h4>
+    <button class="btn btn-primary" @onclick="NewJob">
+        <i class="bi bi-plus-lg me-1"></i>New Job
+    </button>
+</div>
+
+@if (IsEditing)
+{
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white fw-semibold">
+            @(EditingJob.Id == Guid.Empty ? "New Scheduled Job" : $"Edit: {EditingJob.Name}")
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold">Job Name</label>
+                    <input class="form-control" @bind="EditingJob.Name" placeholder="e.g. Nightly Disk Check" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Script</label>
+                    <select class="form-select" @bind="EditingJob.ScriptId">
+                        <option value="@Guid.Empty">— select a script —</option>
+                        @foreach (var script in ScriptService.Scripts.OrderBy(s => s.Name))
+                        {
+                            <option value="@script.Id">@script.Name (@script.Language.ToDisplayName())</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">
+                        Enabled
+                    </label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               @bind="EditingJob.IsEnabled" id="enabledSwitch" />
+                        <label class="form-check-label" for="enabledSwitch">
+                            @(EditingJob.IsEnabled ? "Active" : "Paused")
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-1">
+                <label class="form-label fw-semibold">Cron Expression</label>
+                <div class="input-group" style="max-width: 340px;">
+                    <span class="input-group-text font-monospace text-muted small">min hr day mo dow</span>
+                    <input class="form-control font-monospace"
+                           @bind="EditingJob.CronExpression"
+                           @bind:event="oninput"
+                           placeholder="0 * * * *" />
+                </div>
+            </div>
+
+            <div class="mb-2 d-flex flex-wrap gap-1">
+                @foreach (var preset in CronPresets)
+                {
+                    <button class="btn btn-sm btn-outline-secondary"
+                            @onclick="() => ApplyPreset(preset.Cron)">
+                        @preset.Label
+                    </button>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(EditingJob.CronExpression))
+            {
+                var next = Scheduler.GetNextOccurrence(EditingJob.CronExpression);
+                @if (next.HasValue)
+                {
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Next run: <strong>@next.Value.ToLocalTime().ToString("f")</strong>
+                        (@FormatTimeUntil(next.Value))
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Invalid cron expression.
+                        Use 5 fields: minute hour day month day-of-week.
+                    </div>
+                }
+            }
+
+            @if (!string.IsNullOrEmpty(ValidationError))
+            {
+                <div class="alert alert-danger py-2">@ValidationError</div>
+            }
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveJob">
+                    <i class="bi bi-floppy me-1"></i>Save
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!Scheduler.Jobs.Any())
+{
+    <div class="text-muted">No scheduled jobs yet. Click "New Job" to create one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Enabled</th>
+                    <th>Name</th>
+                    <th>Script</th>
+                    <th>Schedule</th>
+                    <th>Next Run</th>
+                    <th>Last Run</th>
+                    <th>Last Result</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var job in Scheduler.Jobs.OrderBy(j => j.Name))
+                {
+                    var script = ScriptService.GetScript(job.ScriptId);
+                    <tr class="@(job.IsEnabled ? "" : "table-secondary opacity-75")">
+                        <td>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       checked="@job.IsEnabled"
+                                       @onchange="() => ToggleEnabled(job)" />
+                            </div>
+                        </td>
+                        <td class="fw-semibold">@job.Name</td>
+                        <td>
+                            @if (script is not null)
+                            {
+                                <span class="badge @script.Language.ToBadgeClass()">@script.Language.ToDisplayName()</span>
+                                <span class="ms-1 small">@script.Name</span>
+                            }
+                            else
+                            {
+                                <span class="text-danger small"><i class="bi bi-exclamation-triangle"></i> Script not found</span>
+                            }
+                        </td>
+                        <td><code class="small">@job.CronExpression</code></td>
+                        <td class="text-nowrap small">
+                            @if (job.IsEnabled && job.NextRunAt.HasValue)
+                            {
+                                <span title="@job.NextRunAt.Value.ToLocalTime().ToString("f")">
+                                    @FormatTimeUntil(job.NextRunAt.Value)
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td class="text-nowrap small text-muted">
+                            @(job.LastRunAt.HasValue ? job.LastRunAt.Value.ToLocalTime().ToString("g") : "Never")
+                        </td>
+                        <td>
+                            @if (job.LastExitCode.HasValue)
+                            {
+                                <span class="badge @(job.LastRunSucceeded ? "bg-success" : "bg-danger")">
+                                    exit @job.LastExitCode
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                @if (script is not null)
+                                {
+                                    <button class="btn btn-sm btn-success" title="Run now"
+                                            @onclick="() => RunNow(job)">
+                                        <i class="bi bi-play-fill"></i>
+                                    </button>
+                                }
+                                <button class="btn btn-sm btn-outline-primary" title="Edit"
+                                        @onclick="() => EditJob(job)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" title="Delete"
+                                        @onclick="() => ConfirmDelete(job)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (DeletingJob is not null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Delete job <strong>@DeletingJob.Name</strong>? This cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" @onclick="DeleteConfirmed">Delete</button>
+                    <button class="btn btn-secondary" @onclick="() => DeletingJob = null">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ScheduledJob EditingJob { get; set; } = new() { Id = Guid.Empty };
+    private bool IsEditing { get; set; }
+    private string ValidationError { get; set; } = string.Empty;
+    private ScheduledJob? DeletingJob { get; set; }
+
+    private static readonly (string Label, string Cron)[] CronPresets =
+    [
+        ("Every minute",    "* * * * *"),
+        ("Every 5 min",     "*/5 * * * *"),
+        ("Every hour",      "0 * * * *"),
+        ("Daily midnight",  "0 0 * * *"),
+        ("Daily 8am",       "0 8 * * *"),
+        ("Weekly Sunday",   "0 0 * * 0"),
+        ("Monthly 1st",     "0 0 1 * *"),
+    ];
+
+    private void NewJob()
+    {
+        EditingJob = new ScheduledJob { Id = Guid.Empty };
+        ValidationError = string.Empty;
+        IsEditing = true;
+    }
+
+    private void EditJob(ScheduledJob job)
+    {
+        EditingJob = new ScheduledJob
+        {
+            Id = job.Id,
+            Name = job.Name,
+            ScriptId = job.ScriptId,
+            CronExpression = job.CronExpression,
+            IsEnabled = job.IsEnabled,
+            LastRunAt = job.LastRunAt,
+            NextRunAt = job.NextRunAt,
+            LastExitCode = job.LastExitCode,
+            CreatedAt = job.CreatedAt
+        };
+        ValidationError = string.Empty;
+        IsEditing = true;
+    }
+
+    private void SaveJob()
+    {
+        if (string.IsNullOrWhiteSpace(EditingJob.Name))
+        {
+            ValidationError = "Job name is required.";
+            return;
+        }
+        if (EditingJob.ScriptId == Guid.Empty)
+        {
+            ValidationError = "Please select a script.";
+            return;
+        }
+        if (Scheduler.GetNextOccurrence(EditingJob.CronExpression) is null)
+        {
+            ValidationError = "Cron expression is invalid or empty.";
+            return;
+        }
+
+        if (EditingJob.Id == Guid.Empty)
+        {
+            EditingJob.Id = Guid.NewGuid();
+            Scheduler.AddJob(EditingJob);
+        }
+        else
+        {
+            Scheduler.UpdateJob(EditingJob);
+        }
+
+        IsEditing = false;
+    }
+
+    private void CancelEdit() => IsEditing = false;
+
+    private void ApplyPreset(string cron)
+    {
+        EditingJob.CronExpression = cron;
+    }
+
+    private void ToggleEnabled(ScheduledJob job)
+    {
+        job.IsEnabled = !job.IsEnabled;
+        if (job.IsEnabled)
+            job.NextRunAt = Scheduler.GetNextOccurrence(job.CronExpression);
+        Scheduler.UpdateJob(job);
+    }
+
+    private void RunNow(ScheduledJob job) =>
+        Nav.NavigateTo($"/runner/{job.ScriptId}");
+
+    private void ConfirmDelete(ScheduledJob job) => DeletingJob = job;
+
+    private void DeleteConfirmed()
+    {
+        if (DeletingJob is not null)
+        {
+            Scheduler.DeleteJob(DeletingJob.Id);
+            DeletingJob = null;
+        }
+    }
+
+    private static string FormatTimeUntil(DateTime utc)
+    {
+        var diff = utc - DateTime.UtcNow;
+        if (diff.TotalSeconds < 0) return "overdue";
+        if (diff.TotalMinutes < 1) return $"{(int)diff.TotalSeconds}s";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h {diff.Minutes}m";
+        return $"{(int)diff.TotalDays}d {diff.Hours}h";
+    }
+}
