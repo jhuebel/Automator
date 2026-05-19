@@ -1,54 +1,80 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Automator.Web.Data;
 using Automator.Web.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Automator.Web.Services;
 
 public class ScriptRunnerService : IScriptRunnerService
 {
-    private readonly List<ScriptDefinition> _scripts = [];
-    private readonly List<ScriptExecutionResult> _history = [];
+    private readonly IDbContextFactory<AutomatorDbContext> _dbFactory;
     private readonly ILogger<ScriptRunnerService> _logger;
     private readonly SemaphoreSlim _executionLock = new(5, 5);
 
-    public ScriptRunnerService(ILogger<ScriptRunnerService> logger)
+    public ScriptRunnerService(IDbContextFactory<AutomatorDbContext> dbFactory, ILogger<ScriptRunnerService> logger)
     {
+        _dbFactory = dbFactory;
         _logger = logger;
-        SeedExampleScripts();
     }
 
-    public IReadOnlyList<ScriptDefinition> Scripts => _scripts.AsReadOnly();
-    public IReadOnlyList<ScriptExecutionResult> ExecutionHistory => _history.AsReadOnly();
+    public IReadOnlyList<ScriptDefinition> Scripts
+    {
+        get
+        {
+            using var db = _dbFactory.CreateDbContext();
+            return db.Scripts.OrderBy(s => s.Name).ToList();
+        }
+    }
+
+    public IReadOnlyList<ScriptExecutionResult> ExecutionHistory
+    {
+        get
+        {
+            using var db = _dbFactory.CreateDbContext();
+            return db.ExecutionHistory.OrderByDescending(r => r.StartedAt).Take(500).ToList();
+        }
+    }
 
     public ScriptDefinition AddScript(ScriptDefinition script)
     {
-        _scripts.Add(script);
+        using var db = _dbFactory.CreateDbContext();
+        db.Scripts.Add(script);
+        db.SaveChanges();
         return script;
     }
 
     public void UpdateScript(ScriptDefinition script)
     {
-        var index = _scripts.FindIndex(s => s.Id == script.Id);
-        if (index >= 0)
-        {
-            script.UpdatedAt = DateTime.UtcNow;
-            _scripts[index] = script;
-        }
+        script.UpdatedAt = DateTime.UtcNow;
+        using var db = _dbFactory.CreateDbContext();
+        db.Scripts.Update(script);
+        db.SaveChanges();
     }
 
-    public void DeleteScript(Guid id) =>
-        _scripts.RemoveAll(s => s.Id == id);
+    public void DeleteScript(Guid id)
+    {
+        using var db = _dbFactory.CreateDbContext();
+        db.Scripts.Where(s => s.Id == id).ExecuteDelete();
+    }
 
-    public ScriptDefinition? GetScript(Guid id) =>
-        _scripts.FirstOrDefault(s => s.Id == id);
+    public ScriptDefinition? GetScript(Guid id)
+    {
+        using var db = _dbFactory.CreateDbContext();
+        return db.Scripts.Find(id);
+    }
 
     public async Task<ScriptExecutionResult> ExecuteScriptAsync(
         Guid scriptId,
         IProgress<OutputLine> progress,
         CancellationToken cancellationToken = default)
     {
-        var script = GetScript(scriptId)
-            ?? throw new ArgumentException($"Script {scriptId} not found");
+        ScriptDefinition script;
+        using (var db = _dbFactory.CreateDbContext())
+        {
+            script = await db.Scripts.FindAsync([scriptId], CancellationToken.None)
+                ?? throw new ArgumentException($"Script {scriptId} not found");
+        }
 
         var result = new ScriptExecutionResult
         {
@@ -56,7 +82,12 @@ public class ScriptRunnerService : IScriptRunnerService
             ScriptName = script.Name,
             Language = script.Language
         };
-        _history.Insert(0, result);
+
+        using (var db = _dbFactory.CreateDbContext())
+        {
+            db.ExecutionHistory.Add(result);
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
 
         await _executionLock.WaitAsync(cancellationToken);
         var tempFile = Path.Combine(Path.GetTempPath(), $"automator_{result.ExecutionId}{script.Language.ToFileExtension()}");
@@ -66,7 +97,6 @@ public class ScriptRunnerService : IScriptRunnerService
             await File.WriteAllTextAsync(tempFile, script.Content, cancellationToken);
 
             var (executor, args) = GetExecutorInfo(script.Language);
-
             var psi = new ProcessStartInfo
             {
                 FileName = executor,
@@ -104,8 +134,12 @@ public class ScriptRunnerService : IScriptRunnerService
         {
             result.CompletedAt = DateTime.UtcNow;
             _executionLock.Release();
-            if (File.Exists(tempFile))
-                File.Delete(tempFile);
+
+            using var db = _dbFactory.CreateDbContext();
+            db.ExecutionHistory.Update(result);
+            await db.SaveChangesAsync(CancellationToken.None);
+
+            if (File.Exists(tempFile)) File.Delete(tempFile);
         }
 
         return result;
@@ -133,7 +167,6 @@ public class ScriptRunnerService : IScriptRunnerService
     private static (string executor, string args) GetExecutorInfo(ScriptLanguage language)
     {
         var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-
         return language switch
         {
             ScriptLanguage.Bash when isWindows => ("wsl.exe", "bash"),
@@ -145,140 +178,5 @@ public class ScriptRunnerService : IScriptRunnerService
             ScriptLanguage.Ansible => ("ansible-playbook", ""),
             _ => throw new NotSupportedException($"Language {language} is not supported")
         };
-    }
-
-    private void SeedExampleScripts()
-    {
-        _scripts.Add(new ScriptDefinition
-        {
-            Name = "System Info (Bash)",
-            Description = "Displays CPU, memory, and disk information",
-            Language = ScriptLanguage.Bash,
-            Tags = ["system", "diagnostics", "linux"],
-            Content = """
-                #!/bin/bash
-                echo "=== System Information ==="
-                echo "Hostname:  $(hostname)"
-                echo "OS:        $(uname -srm)"
-                echo "Uptime:    $(uptime -p 2>/dev/null || uptime)"
-                echo "CPU Cores: $(nproc)"
-                echo ""
-                echo "=== Memory ==="
-                free -h
-                echo ""
-                echo "=== Disk Usage ==="
-                df -h --output=target,size,used,avail,pcent 2>/dev/null | grep -v tmpfs || df -h
-                """
-        });
-
-        _scripts.Add(new ScriptDefinition
-        {
-            Name = "System Info (PowerShell)",
-            Description = "Displays system information via PowerShell Core (cross-platform)",
-            Language = ScriptLanguage.PowerShell,
-            Tags = ["system", "diagnostics", "windows", "linux"],
-            Content = """
-                Write-Host "=== System Information ===" -ForegroundColor Cyan
-                Write-Host "Hostname:  $([System.Net.Dns]::GetHostName())"
-                Write-Host "OS:        $([System.Environment]::OSVersion.VersionString)"
-                Write-Host "Runtime:   $([System.Runtime.InteropServices.RuntimeInformation]::OSDescription)"
-                Write-Host "CPU Cores: $([System.Environment]::ProcessorCount)"
-                Write-Host ""
-                Write-Host "=== Memory ===" -ForegroundColor Cyan
-                if ($IsWindows) {
-                    $os = Get-CimInstance Win32_OperatingSystem
-                    $totalGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
-                    $freeGB  = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
-                    Write-Host "Total: ${totalGB} GB   Free: ${freeGB} GB"
-                } else {
-                    Get-Content /proc/meminfo | Select-String -Pattern "MemTotal|MemFree|MemAvailable"
-                }
-                """
-        });
-
-        _scripts.Add(new ScriptDefinition
-        {
-            Name = "Python Environment Check",
-            Description = "Reports Python version, platform, and installed packages",
-            Language = ScriptLanguage.Python,
-            Tags = ["python", "diagnostics", "environment"],
-            Content = """
-                import sys, platform, subprocess
-
-                print(f"Python:    {sys.version}")
-                print(f"Platform:  {platform.platform()}")
-                print(f"Machine:   {platform.machine()}")
-                print(f"Processor: {platform.processor()}")
-                print()
-
-                result = subprocess.run(
-                    [sys.executable, "-m", "pip", "list", "--format=columns"],
-                    capture_output=True, text=True
-                )
-                if result.returncode == 0:
-                    print("Installed packages:")
-                    print(result.stdout)
-                else:
-                    print(f"pip error: {result.stderr}")
-                """
-        });
-
-        _scripts.Add(new ScriptDefinition
-        {
-            Name = "Network Connectivity Check (Bash)",
-            Description = "Pings common DNS servers and checks external connectivity",
-            Language = ScriptLanguage.Bash,
-            Tags = ["network", "diagnostics", "linux"],
-            Content = """
-                #!/bin/bash
-                TARGETS=("8.8.8.8" "1.1.1.1" "9.9.9.9")
-                echo "=== Network Connectivity Check ==="
-                for target in "${TARGETS[@]}"; do
-                    if ping -c 1 -W 2 "$target" &>/dev/null; then
-                        echo "[OK]   $target is reachable"
-                    else
-                        echo "[FAIL] $target is unreachable"
-                    fi
-                done
-                echo ""
-                echo "=== DNS Resolution ==="
-                for host in "google.com" "github.com" "microsoft.com"; do
-                    ip=$(dig +short "$host" 2>/dev/null | head -1 || nslookup "$host" 2>/dev/null | awk '/^Address: / { print $2 }' | head -1)
-                    if [ -n "$ip" ]; then
-                        echo "[OK]   $host -> $ip"
-                    else
-                        echo "[FAIL] $host could not be resolved"
-                    fi
-                done
-                """
-        });
-
-        _scripts.Add(new ScriptDefinition
-        {
-            Name = "Disk Space Alert (PowerShell)",
-            Description = "Reports drives with less than 20% free space",
-            Language = ScriptLanguage.PowerShell,
-            Tags = ["storage", "monitoring", "windows", "linux"],
-            Content = """
-                $threshold = 20
-                Write-Host "=== Disk Space Report (threshold: ${threshold}% free) ===" -ForegroundColor Cyan
-                Write-Host ""
-
-                if ($IsWindows) {
-                    $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -gt 0 }
-                    foreach ($drive in $drives) {
-                        $total = $drive.Used + $drive.Free
-                        $pctFree = [math]::Round(($drive.Free / $total) * 100, 1)
-                        $status = if ($pctFree -lt $threshold) { "ALERT" } else { "OK" }
-                        $color  = if ($pctFree -lt $threshold) { "Red" } else { "Green" }
-                        Write-Host "[$status] $($drive.Name): ${pctFree}% free" -ForegroundColor $color
-                    }
-                } else {
-                    df -h | tail -n +2 | while read -r line; do
-                        echo $line
-                    done
-                }
-                """
-        });
     }
 }
