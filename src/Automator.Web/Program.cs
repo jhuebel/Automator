@@ -2,6 +2,7 @@ using Automator.Web.Components;
 using Automator.Web.Data;
 using Automator.Web.Models;
 using Automator.Web.Services;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,8 +10,33 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddRazorPages();
+
 builder.Services.AddDbContextFactory<AutomatorDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+    {
+        options.Password.RequireDigit = true;
+        options.Password.RequiredLength = 8;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+        options.Lockout.MaxFailedAccessAttempts = 5;
+    })
+    .AddEntityFrameworkStores<AutomatorDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/account/login";
+    options.LogoutPath = "/account/logout";
+    options.AccessDeniedPath = "/account/login";
+    options.ExpireTimeSpan = TimeSpan.FromDays(14);
+    options.SlidingExpiration = true;
+});
+
+builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddTransient<IDependencyCheckService, DependencyCheckService>();
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
@@ -19,9 +45,22 @@ builder.Services.AddHostedService<SchedulerBackgroundService>();
 
 var app = builder.Build();
 
-// Ensure DB exists, clean up orphans, seed if empty
-using (var db = app.Services.GetRequiredService<IDbContextFactory<AutomatorDbContext>>().CreateDbContext())
+// Ensure DB schema exists (handles schema upgrade from pre-Identity builds)
+using (var scope = app.Services.CreateScope())
 {
+    var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AutomatorDbContext>>();
+    using var db = factory.CreateDbContext();
+
+    try
+    {
+        // Probe for Identity tables — if missing, schema needs to be rebuilt
+        db.Users.FirstOrDefault();
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException)
+    {
+        db.Database.EnsureDeleted();
+    }
+
     db.Database.EnsureCreated();
 
     var orphaned = db.ExecutionHistory.Where(r => r.CompletedAt == null).ToList();
@@ -33,6 +72,35 @@ using (var db = app.Services.GetRequiredService<IDbContextFactory<AutomatorDbCon
     }
     if (orphaned.Count > 0) db.SaveChanges();
 
+    // Seed roles
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    foreach (var role in new[] { "Admin", "Operator", "Viewer" })
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new IdentityRole(role));
+    }
+
+    // Seed default admin
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var adminConfig = app.Configuration.GetSection("DefaultAdmin");
+    var adminUsername = adminConfig["Username"] ?? "admin";
+    var adminEmail = adminConfig["Email"] ?? "admin@localhost";
+    var adminPassword = adminConfig["Password"] ?? "Admin1234!";
+
+    if (await userManager.FindByNameAsync(adminUsername) is null)
+    {
+        var adminUser = new ApplicationUser
+        {
+            UserName = adminUsername,
+            Email = adminEmail,
+            EmailConfirmed = true
+        };
+        var result = await userManager.CreateAsync(adminUser, adminPassword);
+        if (result.Succeeded)
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+    }
+
+    // Seed example scripts and jobs if empty
     if (!db.Scripts.Any())
         DataSeeder.Seed(db);
 }
@@ -44,7 +112,17 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
+
+app.MapRazorPages();
+
+app.MapGet("/account/logout", async (SignInManager<ApplicationUser> signInManager) =>
+{
+    await signInManager.SignOutAsync();
+    return Results.Redirect("/account/login");
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

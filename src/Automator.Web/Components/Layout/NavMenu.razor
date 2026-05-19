@@ -39,6 +39,13 @@
                 <i class="bi bi-heart-pulse me-2"></i>System Status
             </NavLink>
         </li>
+        <AuthorizeView Roles="Admin">
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="users">
+                    <i class="bi bi-people-fill me-2"></i>Users
+                </NavLink>
+            </li>
+        </AuthorizeView>
     </ul>
 
     <div class="mt-auto p-3 border-top border-secondary">

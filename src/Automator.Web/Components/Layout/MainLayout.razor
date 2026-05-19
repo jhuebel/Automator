@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@rendermode InteractiveServer
 
 <div class="d-flex vh-100">
     <NavMenu />
@@ -8,6 +9,25 @@
             <i class="bi bi-lightning-charge-fill text-warning fs-5"></i>
             <span class="fw-semibold">Automator</span>
             <span class="text-secondary small ms-1">IaaS Script Automation</span>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <AuthorizeView Roles="Admin" Context="_">
+                            <span class="badge bg-danger">Admin</span>
+                        </AuthorizeView>
+                        <AuthorizeView Roles="Operator" Context="_">
+                            <span class="badge bg-primary">Operator</span>
+                        </AuthorizeView>
+                        <AuthorizeView Roles="Viewer" Context="_">
+                            <span class="badge bg-secondary">Viewer</span>
+                        </AuthorizeView>
+                        <span class="small text-light">@context.User.Identity?.Name</span>
+                        <a href="/account/logout" class="btn btn-sm btn-outline-secondary text-white">
+                            <i class="bi bi-box-arrow-right me-1"></i>Sign Out
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
         </header>
 
         <main class="flex-grow-1 overflow-auto p-4">

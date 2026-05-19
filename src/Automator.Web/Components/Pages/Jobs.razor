@@ -1,4 +1,5 @@
 @page "/jobs"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject IJobSchedulerService Scheduler
 @inject IScriptRunnerService ScriptService
@@ -8,9 +9,11 @@
 
 <div class="d-flex align-items-center justify-content-between mb-4">
     <h4 class="mb-0">Scheduled Jobs</h4>
-    <button class="btn btn-primary" @onclick="NewJob">
-        <i class="bi bi-plus-lg me-1"></i>New Job
-    </button>
+    <AuthorizeView Roles="Admin,Operator">
+        <button class="btn btn-primary" @onclick="NewJob">
+            <i class="bi bi-plus-lg me-1"></i>New Job
+        </button>
+    </AuthorizeView>
 </div>
 
 @if (IsEditing)
@@ -131,11 +134,20 @@ else
                     var script = ScriptService.GetScript(job.ScriptId);
                     <tr class="@(job.IsEnabled ? "" : "table-secondary opacity-75")">
                         <td>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" role="switch"
-                                       checked="@job.IsEnabled"
-                                       @onchange="() => ToggleEnabled(job)" />
-                            </div>
+                            <AuthorizeView Roles="Admin,Operator">
+                                <Authorized>
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" role="switch"
+                                               checked="@job.IsEnabled"
+                                               @onchange="() => ToggleEnabled(job)" />
+                                    </div>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <span class="badge @(job.IsEnabled ? "bg-success" : "bg-secondary")">
+                                        @(job.IsEnabled ? "On" : "Off")
+                                    </span>
+                                </NotAuthorized>
+                            </AuthorizeView>
                         </td>
                         <td class="fw-semibold">@job.Name</td>
                         <td>
@@ -178,23 +190,25 @@ else
                             }
                         </td>
                         <td>
-                            <div class="d-flex gap-1">
-                                @if (script is not null)
-                                {
-                                    <button class="btn btn-sm btn-success" title="Run now"
-                                            @onclick="() => RunNow(job)">
-                                        <i class="bi bi-play-fill"></i>
+                            <AuthorizeView Roles="Admin,Operator">
+                                <div class="d-flex gap-1">
+                                    @if (script is not null)
+                                    {
+                                        <button class="btn btn-sm btn-success" title="Run now"
+                                                @onclick="() => RunNow(job)">
+                                            <i class="bi bi-play-fill"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-sm btn-outline-primary" title="Edit"
+                                            @onclick="() => EditJob(job)">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
-                                }
-                                <button class="btn btn-sm btn-outline-primary" title="Edit"
-                                        @onclick="() => EditJob(job)">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" title="Delete"
-                                        @onclick="() => ConfirmDelete(job)">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
+                                    <button class="btn btn-sm btn-outline-danger" title="Delete"
+                                            @onclick="() => ConfirmDelete(job)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </AuthorizeView>
                         </td>
                     </tr>
                 }

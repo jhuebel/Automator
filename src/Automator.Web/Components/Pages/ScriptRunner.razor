@@ -1,5 +1,6 @@
 @page "/runner"
 @page "/runner/{ScriptId:guid}"
+@attribute [Authorize(Roles = "Admin,Operator")]
 @rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 @implements IDisposable

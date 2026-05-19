@@ -1,4 +1,5 @@
 @page "/scripts"
+@attribute [Authorize]
 @rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 @inject NavigationManager Nav
@@ -7,9 +8,11 @@
 
 <div class="d-flex align-items-center justify-content-between mb-4">
     <h4 class="mb-0">Script Library</h4>
-    <button class="btn btn-primary" @onclick="NewScript">
-        <i class="bi bi-plus-lg me-1"></i>New Script
-    </button>
+    <AuthorizeView Roles="Admin">
+        <button class="btn btn-primary" @onclick="NewScript">
+            <i class="bi bi-plus-lg me-1"></i>New Script
+        </button>
+    </AuthorizeView>
 </div>
 
 @if (IsEditing)
@@ -100,15 +103,19 @@
                             <small class="text-muted">Updated @script.UpdatedAt.ToLocalTime().ToString("g")</small>
                         </div>
                         <div class="d-flex gap-1 flex-shrink-0">
-                            <button class="btn btn-sm btn-success" @onclick="() => RunScript(script.Id)" title="Run">
-                                <i class="bi bi-play-fill"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary" @onclick="() => EditScript(script)" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(script)" title="Delete">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <AuthorizeView Roles="Admin,Operator">
+                                <button class="btn btn-sm btn-success" @onclick="() => RunScript(script.Id)" title="Run">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                            </AuthorizeView>
+                            <AuthorizeView Roles="Admin">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditScript(script)" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(script)" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </AuthorizeView>
                         </div>
                     </div>
                     <details class="mt-2">

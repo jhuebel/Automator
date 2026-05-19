@@ -1,10 +1,11 @@
 using System.Text.Json;
 using Automator.Web.Models;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Automator.Web.Data;
 
-public class AutomatorDbContext : DbContext
+public class AutomatorDbContext : IdentityDbContext<ApplicationUser>
 {
     private static readonly JsonSerializerOptions JsonOptions = new();
 
@@ -16,6 +17,8 @@ public class AutomatorDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<ScriptExecutionResult>()
             .HasKey(r => r.ExecutionId);
 
