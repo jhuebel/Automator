@@ -1,0 +1,85 @@
+@page "/history"
+@rendermode InteractiveServer
+@inject IScriptRunnerService ScriptService
+
+<PageTitle>Execution History - Automator</PageTitle>
+
+<h4 class="mb-4">Execution History</h4>
+
+@if (!ScriptService.ExecutionHistory.Any())
+{
+    <div class="text-muted">No executions yet. <a href="/runner">Run a script</a> to get started.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Status</th>
+                    <th>Script</th>
+                    <th>Language</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                    <th>Exit Code</th>
+                    <th>Output Lines</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var run in ScriptService.ExecutionHistory)
+                {
+                    <tr>
+                        <td>
+                            @if (run.IsRunning)
+                            {
+                                <span class="spinner-border spinner-border-sm text-warning"></span>
+                            }
+                            else if (run.IsSuccess)
+                            {
+                                <i class="bi bi-check-circle-fill text-success" title="Success"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-circle-fill text-danger" title="Failed (exit @run.ExitCode)"></i>
+                            }
+                        </td>
+                        <td class="fw-semibold">@run.ScriptName</td>
+                        <td><span class="badge @run.Language.ToBadgeClass()">@run.Language.ToDisplayName()</span></td>
+                        <td class="text-nowrap">@run.StartedAt.ToLocalTime().ToString("g")</td>
+                        <td class="text-nowrap">
+                            @if (run.Duration.HasValue)
+                            {
+                                @($"{run.Duration.Value.TotalSeconds:F2}s")
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (run.ExitCode.HasValue)
+                            {
+                                <span class="badge @(run.IsSuccess ? "bg-success" : "bg-danger")">@run.ExitCode</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#output-@run.ExecutionId">
+                                @run.Output.Count lines
+                            </button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="output-@run.ExecutionId">
+                        <td colspan="7" class="p-0">
+                            <pre class="bg-dark text-light p-3 m-0 small font-monospace"
+                                 style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">@foreach (var line in run.Output)
+{<span class="@(line.IsError ? "text-danger" : "")">@line.Text
+</span>}</pre>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

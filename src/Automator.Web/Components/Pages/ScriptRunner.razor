@@ -1,0 +1,192 @@
+@page "/runner"
+@page "/runner/{ScriptId:guid}"
+@rendermode InteractiveServer
+@inject IScriptRunnerService ScriptService
+@implements IDisposable
+
+<PageTitle>Run Script - Automator</PageTitle>
+
+<h4 class="mb-4">Run Script</h4>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header fw-semibold">Select Script</div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                    @foreach (var script in ScriptService.Scripts.OrderBy(s => s.Name))
+                    {
+                        <li class="list-group-item list-group-item-action @(SelectedScript?.Id == script.Id ? "active" : "")"
+                            style="cursor: pointer;"
+                            @onclick="() => SelectScript(script)">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge @script.Language.ToBadgeClass() text-nowrap">@script.Language.ToDisplayName()</span>
+                                <span class="small">@script.Name</span>
+                            </div>
+                        </li>
+                    }
+                    @if (!ScriptService.Scripts.Any())
+                    {
+                        <li class="list-group-item text-muted">
+                            No scripts. <a href="/scripts">Add one</a>.
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+        @if (SelectedScript is not null)
+        {
+            <div class="card mt-3">
+                <div class="card-header fw-semibold">Script Details</div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <span class="badge @SelectedScript.Language.ToBadgeClass() mb-1">@SelectedScript.Language.ToDisplayName()</span>
+                        <div class="fw-semibold">@SelectedScript.Name</div>
+                        @if (!string.IsNullOrEmpty(SelectedScript.Description))
+                        {
+                            <small class="text-muted">@SelectedScript.Description</small>
+                        }
+                    </div>
+                    @foreach (var tag in SelectedScript.Tags)
+                    {
+                        <span class="badge bg-secondary me-1">@tag</span>
+                    }
+                </div>
+                <div class="card-footer d-flex gap-2">
+                    @if (!IsRunning)
+                    {
+                        <button class="btn btn-success w-100" @onclick="RunSelected">
+                            <i class="bi bi-play-fill me-1"></i>Run
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-danger w-100" @onclick="CancelRun">
+                            <i class="bi bi-stop-fill me-1"></i>Cancel
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between fw-semibold">
+                <span>
+                    <i class="bi bi-terminal me-2"></i>Output
+                    @if (IsRunning)
+                    {
+                        <span class="spinner-border spinner-border-sm text-warning ms-2"></span>
+                    }
+                    else if (CurrentResult is not null)
+                    {
+                        @if (CurrentResult.IsSuccess)
+                        {
+                            <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+                        }
+                    }
+                </span>
+                @if (CurrentResult is not null)
+                {
+                    <div class="d-flex gap-2 align-items-center">
+                        @if (CurrentResult.Duration.HasValue)
+                        {
+                            <small class="text-muted">@CurrentResult.Duration.Value.TotalSeconds.ToString("F2")s</small>
+                        }
+                        @if (CurrentResult.ExitCode.HasValue)
+                        {
+                            <span class="badge @(CurrentResult.IsSuccess ? "bg-success" : "bg-danger")">
+                                exit @CurrentResult.ExitCode
+                            </span>
+                        }
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearOutput">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+            <div class="card-body p-0">
+                <pre id="output-container"
+                     class="bg-dark text-light p-3 mb-0 rounded-bottom font-monospace small"
+                     style="min-height: 400px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">@if (OutputLines.Count == 0)
+{<span class="text-secondary">Select a script and click Run to see output here.</span>}
+@foreach (var line in OutputLines)
+{<span class="@(line.IsError ? "text-danger" : "")">@line.Text
+</span>}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid? ScriptId { get; set; }
+
+    private ScriptDefinition? SelectedScript { get; set; }
+    private ScriptExecutionResult? CurrentResult { get; set; }
+    private List<OutputLine> OutputLines { get; } = [];
+    private bool IsRunning { get; set; }
+    private CancellationTokenSource? _cts;
+
+    protected override void OnParametersSet()
+    {
+        if (ScriptId.HasValue)
+            SelectedScript = ScriptService.GetScript(ScriptId.Value);
+    }
+
+    private void SelectScript(ScriptDefinition script)
+    {
+        SelectedScript = script;
+        ClearOutput();
+    }
+
+    private async Task RunSelected()
+    {
+        if (SelectedScript is null || IsRunning) return;
+
+        OutputLines.Clear();
+        IsRunning = true;
+        _cts = new CancellationTokenSource();
+
+        var progress = new Progress<OutputLine>(line =>
+        {
+            OutputLines.Add(line);
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            CurrentResult = await ScriptService.ExecuteScriptAsync(
+                SelectedScript.Id, progress, _cts.Token);
+        }
+        finally
+        {
+            IsRunning = false;
+            _cts?.Dispose();
+            _cts = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void CancelRun()
+    {
+        _cts?.Cancel();
+    }
+
+    private void ClearOutput()
+    {
+        OutputLines.Clear();
+        CurrentResult = null;
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

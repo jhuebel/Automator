@@ -1,0 +1,228 @@
+@page "/scripts"
+@rendermode InteractiveServer
+@inject IScriptRunnerService ScriptService
+@inject NavigationManager Nav
+
+<PageTitle>Script Library - Automator</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h4 class="mb-0">Script Library</h4>
+    <button class="btn btn-primary" @onclick="NewScript">
+        <i class="bi bi-plus-lg me-1"></i>New Script
+    </button>
+</div>
+
+@if (IsEditing)
+{
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white fw-semibold">
+            @(EditingScript.Id == Guid.Empty ? "New Script" : $"Edit: {EditingScript.Name}")
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Name</label>
+                    <input class="form-control" @bind="EditingScript.Name" placeholder="Script name" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Language</label>
+                    <select class="form-select" @bind="EditingScript.Language">
+                        @foreach (var lang in Enum.GetValues<ScriptLanguage>())
+                        {
+                            <option value="@lang">@lang.ToDisplayName()</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Tags (comma-separated)</label>
+                    <input class="form-control" value="@TagsText"
+                           @onchange="e => TagsText = e.Value?.ToString() ?? string.Empty"
+                           placeholder="e.g. network, diagnostics" />
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Description</label>
+                <input class="form-control" @bind="EditingScript.Description" placeholder="Brief description" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Script Content</label>
+                <textarea class="form-control font-monospace" rows="12"
+                          @bind="EditingScript.Content"
+                          placeholder="Enter your script here..."></textarea>
+            </div>
+            @if (!string.IsNullOrEmpty(ValidationError))
+            {
+                <div class="alert alert-danger py-2">@ValidationError</div>
+            }
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveScript">
+                    <i class="bi bi-floppy me-1"></i>Save
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="mb-3 d-flex gap-2 align-items-center">
+    <input class="form-control" style="max-width: 300px;"
+           placeholder="Search scripts..."
+           @bind="SearchTerm" @bind:event="oninput" />
+    <select class="form-select" style="max-width: 180px;" @bind="LanguageFilter">
+        <option value="">All languages</option>
+        @foreach (var lang in Enum.GetValues<ScriptLanguage>())
+        {
+            <option value="@lang">@lang.ToDisplayName()</option>
+        }
+    </select>
+</div>
+
+<div class="row g-3">
+    @foreach (var script in FilteredScripts)
+    {
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h6 class="mb-0 fw-semibold">@script.Name</h6>
+                                <span class="badge @script.Language.ToBadgeClass()">@script.Language.ToDisplayName()</span>
+                                @foreach (var tag in script.Tags)
+                                {
+                                    <span class="badge bg-secondary">@tag</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrEmpty(script.Description))
+                            {
+                                <p class="text-muted small mb-1">@script.Description</p>
+                            }
+                            <small class="text-muted">Updated @script.UpdatedAt.ToLocalTime().ToString("g")</small>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            <button class="btn btn-sm btn-success" @onclick="() => RunScript(script.Id)" title="Run">
+                                <i class="bi bi-play-fill"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => EditScript(script)" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(script)" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <details class="mt-2">
+                        <summary class="text-muted small" style="cursor: pointer;">View source</summary>
+                        <pre class="bg-dark text-light p-2 mt-2 rounded small" style="max-height: 200px; overflow: auto;">@script.Content</pre>
+                    </details>
+                </div>
+            </div>
+        </div>
+    }
+    @if (!FilteredScripts.Any())
+    {
+        <div class="col-12 text-muted">No scripts match your search.</div>
+    }
+</div>
+
+@if (DeletingScript is not null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Delete <strong>@DeletingScript.Name</strong>? This cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" @onclick="DeleteConfirmed">Delete</button>
+                    <button class="btn btn-secondary" @onclick="() => DeletingScript = null">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ScriptDefinition EditingScript { get; set; } = new();
+    private bool IsEditing { get; set; }
+    private string ValidationError { get; set; } = string.Empty;
+    private string TagsText { get; set; } = string.Empty;
+    private string SearchTerm { get; set; } = string.Empty;
+    private string LanguageFilter { get; set; } = string.Empty;
+    private ScriptDefinition? DeletingScript { get; set; }
+
+    private IEnumerable<ScriptDefinition> FilteredScripts =>
+        ScriptService.Scripts
+            .Where(s => string.IsNullOrEmpty(SearchTerm) ||
+                        s.Name.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        s.Description.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        s.Tags.Any(t => t.Contains(SearchTerm, StringComparison.OrdinalIgnoreCase)))
+            .Where(s => string.IsNullOrEmpty(LanguageFilter) ||
+                        s.Language.ToString() == LanguageFilter)
+            .OrderBy(s => s.Name);
+
+    private void NewScript()
+    {
+        EditingScript = new ScriptDefinition { Id = Guid.Empty };
+        TagsText = string.Empty;
+        ValidationError = string.Empty;
+        IsEditing = true;
+    }
+
+    private void EditScript(ScriptDefinition script)
+    {
+        EditingScript = script.Clone();
+        TagsText = string.Join(", ", script.Tags);
+        ValidationError = string.Empty;
+        IsEditing = true;
+    }
+
+    private void SaveScript()
+    {
+        if (string.IsNullOrWhiteSpace(EditingScript.Name))
+        {
+            ValidationError = "Script name is required.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(EditingScript.Content))
+        {
+            ValidationError = "Script content is required.";
+            return;
+        }
+
+        EditingScript.Tags = TagsText
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        if (EditingScript.Id == Guid.Empty)
+        {
+            EditingScript.Id = Guid.NewGuid();
+            ScriptService.AddScript(EditingScript);
+        }
+        else
+        {
+            ScriptService.UpdateScript(EditingScript);
+        }
+
+        IsEditing = false;
+    }
+
+    private void CancelEdit() => IsEditing = false;
+
+    private void ConfirmDelete(ScriptDefinition script) => DeletingScript = script;
+
+    private void DeleteConfirmed()
+    {
+        if (DeletingScript is not null)
+        {
+            ScriptService.DeleteScript(DeletingScript.Id);
+            DeletingScript = null;
+        }
+    }
+
+    private void RunScript(Guid scriptId) =>
+        Nav.NavigateTo($"/runner/{scriptId}");
+}
