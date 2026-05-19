@@ -8,6 +8,22 @@
 
 <h4 class="mb-4">Dashboard</h4>
 
+@if (!ScriptService.Scripts.Any())
+{
+    <div class="alert alert-info d-flex gap-3 mb-4 align-items-start">
+        <i class="bi bi-lightbulb-fill fs-4 flex-shrink-0 mt-1 text-warning"></i>
+        <div>
+            <strong>Welcome to Automator!</strong> Here's how to get started:
+            <ol class="mb-0 mt-1 ps-3 small">
+                <li>Open <a href="/scripts" class="alert-link">Script Library</a> to browse or create scripts</li>
+                <li>Head to <a href="/runner" class="alert-link">Run Script</a> to execute one on demand</li>
+                <li>Set up <a href="/jobs" class="alert-link">Scheduled Jobs</a> to automate recurring tasks</li>
+                <li>Check <a href="/status" class="alert-link">System Status</a> to verify required runtimes are installed</li>
+            </ol>
+        </div>
+    </div>
+}
+
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card text-bg-primary h-100">

@@ -1,0 +1,19 @@
+<div class="mb-3">
+    <button type="button" class="btn btn-sm btn-outline-info" @onclick="Toggle">
+        <i class="bi bi-question-circle me-1"></i>@(_visible ? "Hide Help" : "Help")
+    </button>
+    @if (_visible)
+    {
+        <div class="card border-info mt-2" style="background: rgba(13,202,240,0.06);">
+            <div class="card-body py-2 small text-body">
+                @ChildContent
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+    private bool _visible;
+    private void Toggle() => _visible = !_visible;
+}

@@ -6,12 +6,22 @@
 
 <PageTitle>User Management - Automator</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0">User Management</h4>
     <button class="btn btn-primary" @onclick="() => { IsAdding = true; ClearForm(); }">
         <i class="bi bi-person-plus-fill me-1"></i>Add User
     </button>
 </div>
+
+<PageHelp>
+    <strong>Role access levels:</strong>
+    <ul class="mb-0 mt-1 ps-3">
+        <li><strong>Admin</strong> — full access: manage users, create/edit/delete scripts, manage jobs, and run scripts</li>
+        <li><strong>Operator</strong> — run scripts and manage scheduled jobs; cannot edit scripts or manage users</li>
+        <li><strong>Viewer</strong> — read-only: browse scripts, view history, and check system status</li>
+    </ul>
+    You cannot change your own role or delete your own account.
+</PageHelp>
 
 @if (IsAdding)
 {

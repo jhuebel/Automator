@@ -7,7 +7,7 @@
 
 <PageTitle>Scheduled Jobs - Automator</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0">Scheduled Jobs</h4>
     <AuthorizeView Roles="Admin,Operator">
         <button class="btn btn-primary" @onclick="NewJob">
@@ -15,6 +15,15 @@
         </button>
     </AuthorizeView>
 </div>
+
+<PageHelp>
+    Jobs fire automatically when their cron schedule is due. The scheduler checks every 15 seconds.
+    <ul class="mb-0 mt-1 ps-3">
+        <li>Disable a job to pause it without deleting it</li>
+        <li>Use <strong>Run Now</strong> to trigger a job immediately outside its schedule</li>
+        <li>Jobs share the same execution environment as manually-run scripts</li>
+    </ul>
+</PageHelp>
 
 @if (IsEditing)
 {
@@ -53,7 +62,7 @@
             </div>
 
             <div class="mb-1">
-                <label class="form-label fw-semibold">Cron Expression</label>
+                <label class="form-label fw-semibold">Cron Expression <HelpIcon Text="5 fields: minute (0-59) · hour (0-23) · day-of-month (1-31) · month (1-12) · weekday (0-6, Sun=0). Use * for any, */n for every nth, or comma-separate values. Example: '0 2 * * 1' = every Monday at 2 am." /></label>
                 <div class="input-group" style="max-width: 340px;">
                     <span class="input-group-text font-monospace text-muted small">min hr day mo dow</span>
                     <input class="form-control font-monospace"

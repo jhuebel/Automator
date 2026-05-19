@@ -5,7 +5,7 @@
 
 <PageTitle>System Status - Automator</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-4">
+<div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0">System Status</h4>
     <button class="btn btn-outline-primary" @onclick="RunChecks" disabled="@IsChecking">
         @if (IsChecking)
@@ -20,6 +20,17 @@
         }
     </button>
 </div>
+
+<PageHelp>
+    This page checks that the script interpreters and database are reachable by the application process.
+    Missing runtimes prevent scripts of that language from running.
+    <ul class="mb-0 mt-1 ps-3">
+        <li><strong>Bash</strong> — pre-installed on Linux/macOS; on Windows use Git Bash or WSL</li>
+        <li><strong>PowerShell</strong> — install PowerShell 7+ from <code>github.com/PowerShell/PowerShell</code></li>
+        <li><strong>Python</strong> — install Python 3 from <code>python.org</code> or your system package manager</li>
+        <li><strong>Ansible</strong> — install via pip: <code>pip install ansible</code></li>
+    </ul>
+</PageHelp>
 
 @if (IsChecking && Runtimes is null)
 {
