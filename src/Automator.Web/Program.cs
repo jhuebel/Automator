@@ -12,6 +12,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContextFactory<AutomatorDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddTransient<IDependencyCheckService, DependencyCheckService>();
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
 builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
 builder.Services.AddHostedService<SchedulerBackgroundService>();
