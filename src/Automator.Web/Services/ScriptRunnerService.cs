@@ -10,12 +10,15 @@ public class ScriptRunnerService : IScriptRunnerService
 {
     private readonly IDbContextFactory<AutomatorDbContext> _dbFactory;
     private readonly ILogger<ScriptRunnerService> _logger;
-    private readonly SemaphoreSlim _executionLock = new(5, 5);
+    private readonly SemaphoreSlim _executionLock;
 
     public ScriptRunnerService(IDbContextFactory<AutomatorDbContext> dbFactory, ILogger<ScriptRunnerService> logger)
     {
         _dbFactory = dbFactory;
         _logger = logger;
+        using var db = dbFactory.CreateDbContext();
+        var maxConcurrent = db.Settings.Find(1)?.MaxConcurrentExecutions ?? 5;
+        _executionLock = new SemaphoreSlim(maxConcurrent, maxConcurrent);
     }
 
     public IReadOnlyList<ScriptDefinition> Scripts
@@ -32,7 +35,8 @@ public class ScriptRunnerService : IScriptRunnerService
         get
         {
             using var db = _dbFactory.CreateDbContext();
-            return db.ExecutionHistory.OrderByDescending(r => r.StartedAt).Take(500).ToList();
+            var limit = db.Settings.Find(1)?.MaxHistoryRecords ?? 1000;
+            return db.ExecutionHistory.OrderByDescending(r => r.StartedAt).Take(limit).ToList();
         }
     }
 
@@ -70,10 +74,12 @@ public class ScriptRunnerService : IScriptRunnerService
         CancellationToken cancellationToken = default)
     {
         ScriptDefinition script;
+        AppSetting settings;
         using (var db = _dbFactory.CreateDbContext())
         {
             script = await db.Scripts.FindAsync([scriptId], CancellationToken.None)
                 ?? throw new ArgumentException($"Script {scriptId} not found");
+            settings = await db.Settings.FindAsync([1], CancellationToken.None) ?? new AppSetting();
         }
 
         var result = new ScriptExecutionResult
@@ -90,11 +96,15 @@ public class ScriptRunnerService : IScriptRunnerService
         }
 
         await _executionLock.WaitAsync(cancellationToken);
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(settings.ExecutionTimeoutSeconds));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var execToken = linkedCts.Token;
+
         var tempFile = Path.Combine(Path.GetTempPath(), $"automator_{result.ExecutionId}{script.Language.ToFileExtension()}");
 
         try
         {
-            await File.WriteAllTextAsync(tempFile, script.Content, cancellationToken);
+            await File.WriteAllTextAsync(tempFile, script.Content, execToken);
 
             var (executor, args) = GetExecutorInfo(script.Language);
             var psi = new ProcessStartInfo
@@ -110,10 +120,10 @@ public class ScriptRunnerService : IScriptRunnerService
             using var process = Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start process");
 
-            var outputTask = CaptureStreamAsync(process.StandardOutput, isError: false, result, progress, cancellationToken);
-            var errorTask = CaptureStreamAsync(process.StandardError, isError: true, result, progress, cancellationToken);
+            var outputTask = CaptureStreamAsync(process.StandardOutput, isError: false, result, progress, execToken);
+            var errorTask = CaptureStreamAsync(process.StandardError, isError: true, result, progress, execToken);
 
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExitAsync(execToken);
             await Task.WhenAll(outputTask, errorTask);
 
             result.ExitCode = process.ExitCode;
@@ -122,7 +132,10 @@ public class ScriptRunnerService : IScriptRunnerService
         catch (OperationCanceledException)
         {
             result.ExitCode = -1;
-            ReportLine(new OutputLine { Text = "Execution cancelled by user.", IsError = true }, result, progress);
+            var msg = timeoutCts.IsCancellationRequested
+                ? $"Execution timed out after {settings.ExecutionTimeoutSeconds} seconds."
+                : "Execution cancelled by user.";
+            ReportLine(new OutputLine { Text = msg, IsError = true }, result, progress);
         }
         catch (Exception ex)
         {

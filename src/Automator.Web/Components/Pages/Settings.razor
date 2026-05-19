@@ -1,0 +1,242 @@
+@page "/settings"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject UserManager<ApplicationUser> UserManager
+@inject IDbContextFactory<AutomatorDbContext> DbFactory
+@using Automator.Web.Data
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Settings - Automator</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0">Settings</h4>
+</div>
+
+<PageHelp>
+    <strong>My Account</strong> — change your email or password. These apply to your own account only.<br />
+    <strong>Application Settings</strong> (Admin only) — tune runtime behaviour. Timeout and history changes take effect immediately;
+    concurrency changes require a restart.
+</PageHelp>
+
+<div class="row g-4">
+    <div class="col-lg-5 col-md-6">
+        <div class="card">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-person-gear me-2"></i>My Account
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Signed in as <strong>@CurrentUsername</strong>
+                </p>
+
+                <h6 class="fw-semibold">Email</h6>
+                <div class="d-flex gap-2 mb-2">
+                    <input class="form-control form-control-sm" @bind="NewEmail" type="email" placeholder="Email address" />
+                    <button class="btn btn-sm btn-outline-primary text-nowrap" @onclick="ChangeEmailAsync" disabled="@IsSavingEmail">
+                        Update
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(EmailMessage))
+                {
+                    <div class="alert @(EmailSuccess ? "alert-success" : "alert-danger") py-2 small mb-2">@EmailMessage</div>
+                }
+
+                <hr class="my-3" />
+
+                <h6 class="fw-semibold">Change Password</h6>
+                <div class="d-flex flex-column gap-2 mb-2">
+                    <input class="form-control form-control-sm" @bind="CurrentPassword" type="password" placeholder="Current password" />
+                    <input class="form-control form-control-sm" @bind="NewPassword" type="password" placeholder="New password (min 8 chars)" />
+                    <input class="form-control form-control-sm" @bind="ConfirmPassword" type="password" placeholder="Confirm new password" />
+                </div>
+                <button class="btn btn-sm btn-outline-primary" @onclick="ChangePasswordAsync" disabled="@IsSavingPassword">
+                    Change Password
+                </button>
+                @if (!string.IsNullOrEmpty(PasswordMessage))
+                {
+                    <div class="alert @(PasswordSuccess ? "alert-success" : "alert-danger") py-2 small mt-2">@PasswordMessage</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <AuthorizeView Roles="Admin">
+        <div class="col-lg-5 col-md-6">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-sliders me-2"></i>Application Settings
+                </div>
+                <div class="card-body">
+                    @if (AppSettings is not null)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                Execution Timeout
+                                <HelpIcon Text="Maximum seconds a script may run before it is automatically cancelled. Default: 300 (5 minutes)." />
+                            </label>
+                            <div class="input-group" style="max-width: 200px;">
+                                <input class="form-control" type="number" @bind="AppSettings.ExecutionTimeoutSeconds" min="10" max="3600" />
+                                <span class="input-group-text">s</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                Max Concurrent Executions
+                                <HelpIcon Text="How many scripts may run at the same time. Requires a restart to take effect. Default: 5." />
+                            </label>
+                            <input class="form-control" type="number" @bind="AppSettings.MaxConcurrentExecutions" min="1" max="20" style="max-width: 100px;" />
+                            <div class="form-text">Requires restart to take effect.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                History Retention
+                                <HelpIcon Text="Number of recent execution records shown in History. Older records stay in the database. Default: 1000." />
+                            </label>
+                            <div class="input-group" style="max-width: 200px;">
+                                <input class="form-control" type="number" @bind="AppSettings.MaxHistoryRecords" min="10" max="10000" />
+                                <span class="input-group-text">records</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" @onclick="SaveAppSettingsAsync" disabled="@IsSavingAppSettings">
+                            <i class="bi bi-floppy me-1"></i>Save
+                        </button>
+                        @if (!string.IsNullOrEmpty(AppSettingsMessage))
+                        {
+                            <div class="alert @(AppSettingsSuccess ? "alert-success" : "alert-danger") py-2 small mt-2">@AppSettingsMessage</div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </AuthorizeView>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string? CurrentUserId { get; set; }
+    private string CurrentUsername { get; set; } = string.Empty;
+
+    private string NewEmail { get; set; } = string.Empty;
+    private bool IsSavingEmail { get; set; }
+    private string EmailMessage { get; set; } = string.Empty;
+    private bool EmailSuccess { get; set; }
+
+    private string CurrentPassword { get; set; } = string.Empty;
+    private string NewPassword { get; set; } = string.Empty;
+    private string ConfirmPassword { get; set; } = string.Empty;
+    private bool IsSavingPassword { get; set; }
+    private string PasswordMessage { get; set; } = string.Empty;
+    private bool PasswordSuccess { get; set; }
+
+    private AppSetting? AppSettings { get; set; }
+    private bool IsSavingAppSettings { get; set; }
+    private string AppSettingsMessage { get; set; } = string.Empty;
+    private bool AppSettingsSuccess { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var auth = await AuthState;
+            CurrentUserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            CurrentUsername = auth.User.Identity?.Name ?? string.Empty;
+        }
+
+        if (CurrentUserId is not null)
+        {
+            var user = await UserManager.FindByIdAsync(CurrentUserId);
+            if (user is not null)
+                NewEmail = user.Email ?? string.Empty;
+        }
+
+        using var db = DbFactory.CreateDbContext();
+        AppSettings = db.Settings.Find(1) ?? new AppSetting { Id = 1 };
+    }
+
+    private async Task ChangeEmailAsync()
+    {
+        EmailMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(NewEmail)) { EmailMessage = "Email cannot be empty."; return; }
+
+        IsSavingEmail = true;
+        try
+        {
+            var user = await UserManager.FindByIdAsync(CurrentUserId!);
+            if (user is null) { EmailMessage = "User not found."; return; }
+
+            user.Email = NewEmail.Trim();
+            user.NormalizedEmail = NewEmail.Trim().ToUpperInvariant();
+            user.EmailConfirmed = true;
+            var result = await UserManager.UpdateAsync(user);
+
+            EmailSuccess = result.Succeeded;
+            EmailMessage = result.Succeeded
+                ? "Email updated."
+                : string.Join(" ", result.Errors.Select(e => e.Description));
+        }
+        finally { IsSavingEmail = false; }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        PasswordMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(CurrentPassword) || string.IsNullOrWhiteSpace(NewPassword))
+        {
+            PasswordMessage = "All password fields are required.";
+            return;
+        }
+        if (NewPassword != ConfirmPassword)
+        {
+            PasswordMessage = "New passwords do not match.";
+            return;
+        }
+
+        IsSavingPassword = true;
+        try
+        {
+            var user = await UserManager.FindByIdAsync(CurrentUserId!);
+            if (user is null) { PasswordMessage = "User not found."; return; }
+
+            var result = await UserManager.ChangePasswordAsync(user, CurrentPassword, NewPassword);
+            PasswordSuccess = result.Succeeded;
+            PasswordMessage = result.Succeeded
+                ? "Password changed successfully."
+                : string.Join(" ", result.Errors.Select(e => e.Description));
+
+            if (result.Succeeded)
+                CurrentPassword = NewPassword = ConfirmPassword = string.Empty;
+        }
+        finally { IsSavingPassword = false; }
+    }
+
+    private async Task SaveAppSettingsAsync()
+    {
+        if (AppSettings is null) return;
+        AppSettings.ExecutionTimeoutSeconds = Math.Clamp(AppSettings.ExecutionTimeoutSeconds, 10, 3600);
+        AppSettings.MaxConcurrentExecutions = Math.Clamp(AppSettings.MaxConcurrentExecutions, 1, 20);
+        AppSettings.MaxHistoryRecords = Math.Clamp(AppSettings.MaxHistoryRecords, 10, 10000);
+
+        IsSavingAppSettings = true;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            if (db.Settings.Find(1) is null)
+                db.Settings.Add(AppSettings);
+            else
+                db.Settings.Update(AppSettings);
+            await db.SaveChangesAsync();
+            AppSettingsSuccess = true;
+            AppSettingsMessage = "Settings saved.";
+        }
+        catch (Exception ex)
+        {
+            AppSettingsSuccess = false;
+            AppSettingsMessage = $"Save failed: {ex.Message}";
+        }
+        finally { IsSavingAppSettings = false; }
+    }
+}

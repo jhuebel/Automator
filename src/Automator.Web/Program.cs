@@ -63,6 +63,16 @@ using (var scope = app.Services.CreateScope())
 
     db.Database.EnsureCreated();
 
+    // Add Settings table for existing databases that predate this schema change
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "Settings" (
+            "Id"                       INTEGER NOT NULL CONSTRAINT "PK_Settings" PRIMARY KEY,
+            "ExecutionTimeoutSeconds"  INTEGER NOT NULL DEFAULT 300,
+            "MaxConcurrentExecutions"  INTEGER NOT NULL DEFAULT 5,
+            "MaxHistoryRecords"        INTEGER NOT NULL DEFAULT 1000
+        )
+        """);
+
     var orphaned = db.ExecutionHistory.Where(r => r.CompletedAt == null).ToList();
     foreach (var r in orphaned)
     {
@@ -98,6 +108,13 @@ using (var scope = app.Services.CreateScope())
         var result = await userManager.CreateAsync(adminUser, adminPassword);
         if (result.Succeeded)
             await userManager.AddToRoleAsync(adminUser, "Admin");
+    }
+
+    // Seed default app settings
+    if (!db.Settings.Any())
+    {
+        db.Settings.Add(new AppSetting());
+        db.SaveChanges();
     }
 
     // Seed example scripts and jobs if empty
