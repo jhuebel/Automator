@@ -50,6 +50,12 @@
         await ValueChanged.InvokeAsync(value);
     }
 
+    public async Task<string> GetCurrentValueAsync()
+    {
+        if (!_initialized) return Value;
+        return await JS.InvokeAsync<string>("codeEditor.getValue", _id);
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_initialized)

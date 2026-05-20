@@ -14,7 +14,7 @@
     @* Title bar *@
     <div style="flex-shrink: 0; display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
         <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Color="Color.Default"
-                       OnClick='() => Nav.NavigateTo("/scripts")' title="Back to Script Library" />
+                       OnClick="TryNavigateBack" title="Back to Script Library" />
         <MudText Typo="Typo.h5" Style="margin: 0;">@(_isNew ? "New Script" : $"Edit: {_script.Name}")</MudText>
     </div>
 
@@ -28,11 +28,11 @@
         <div style="flex-shrink: 0; padding: 16px 16px 0;">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_script.Name" @bind-Value:after="MarkDirty" Label="Name" Variant="Variant.Outlined"
+                    <MudTextField @bind-Value="_script.Name" Label="Name" Variant="Variant.Outlined"
                                   Placeholder="Script name" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" md="3">
-                    <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" @bind-Value:after="MarkDirty" Label="Language"
+                    <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" Label="Language"
                                Variant="Variant.Outlined" Margin="Margin.Dense">
                         @foreach (var lang in Enum.GetValues<ScriptLanguage>())
                         {
@@ -41,12 +41,12 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="3">
-                    <MudTextField @bind-Value="_tagsText" @bind-Value:after="MarkDirty" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
+                    <MudTextField @bind-Value="_tagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Placeholder="e.g. network, diagnostics"
                                   HelperText="Comma-separated keywords" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_script.Description" @bind-Value:after="MarkDirty" Label="Description"
+                    <MudTextField @bind-Value="_script.Description" Label="Description"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
                 </MudItem>
             </MudGrid>
@@ -56,7 +56,7 @@
         <div style="flex: 1; min-height: 0; padding: 12px 16px 8px; display: flex; flex-direction: column;">
             <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary); display:block; margin-bottom:4px; flex-shrink:0;">Script Content</MudText>
             <div style="flex: 1; min-height: 0;">
-                <CodeEditor @bind-Value="_script.Content" @bind-Value:after="MarkDirty" Language="@_script.Language" Height="100%" />
+                <CodeEditor @ref="_editor" @bind-Value="_script.Content" Language="@_script.Language" Height="100%" />
             </div>
         </div>
 
@@ -123,7 +123,7 @@
             <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
                        OnClick="SaveScript">Save</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Default"
-                       OnClick='() => Nav.NavigateTo("/scripts")'>Cancel</MudButton>
+                       OnClick="TryNavigateBack">Cancel</MudButton>
         </div>
 
     </div>
@@ -156,10 +156,33 @@
     private string _tagsText = string.Empty;
     private string _validationError = string.Empty;
     private bool _isNew;
-    private bool _isDirty;
     private bool _showUnsavedDialog;
+    private CodeEditor? _editor;
     private string? _pendingNavUrl;
     private IDisposable? _locationChangingReg;
+
+    // Snapshot of values at load time — dirty when current state diverges
+    private string _origName = string.Empty;
+    private ScriptLanguage _origLanguage;
+    private string _origDescription = string.Empty;
+    private string _origContent = string.Empty;
+    private string _origTagsText = string.Empty;
+
+    private bool IsDirty =>
+        _script.Name        != _origName        ||
+        _script.Language    != _origLanguage    ||
+        _script.Description != _origDescription ||
+        _script.Content     != _origContent     ||
+        _tagsText           != _origTagsText;
+
+    private void CaptureSnapshot()
+    {
+        _origName        = _script.Name;
+        _origLanguage    = _script.Language;
+        _origDescription = _script.Description;
+        _origContent     = _script.Content;
+        _origTagsText    = _tagsText;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,9 +206,9 @@
             _tagsText = string.Join(", ", existing.Tags);
             _isNew = false;
         }
-    }
 
-    private void MarkDirty() => _isDirty = true;
+        CaptureSnapshot();
+    }
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -195,16 +218,34 @@
 
     private async ValueTask OnLocationChanging(LocationChangingContext context)
     {
-        if (!_isDirty) return;
+        if (!IsDirty) return;
         context.PreventNavigation();
         _pendingNavUrl = context.TargetLocation;
         _showUnsavedDialog = true;
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task TryNavigateBack()
+    {
+        // Flush the live CodeMirror value before comparing — closes the race between
+        // rapid keystrokes (invokeMethodAsync) and the button click event.
+        if (_editor is not null)
+            _script.Content = await _editor.GetCurrentValueAsync();
+
+        if (IsDirty)
+        {
+            _pendingNavUrl = "/scripts";
+            _showUnsavedDialog = true;
+        }
+        else
+        {
+            Nav.NavigateTo("/scripts");
+        }
+    }
+
     private void DiscardAndNavigate()
     {
-        _isDirty = false;
+        CaptureSnapshot(); // makes IsDirty false so the handler won't re-fire
         _showUnsavedDialog = false;
         var url = _pendingNavUrl ?? "/scripts";
         _pendingNavUrl = null;
@@ -248,6 +289,7 @@
             _ = AuditService.LogAsync("Script.Updated", _script.Name, _script.Language.ToDisplayName(), _username);
         }
 
+        CaptureSnapshot(); // makes IsDirty false so the handler doesn't block the save navigation
         Nav.NavigateTo("/scripts");
     }
 
@@ -316,7 +358,6 @@
         finally
         {
             _aiRunning = false;
-            if (_aiMode != 2) _isDirty = true;
             _aiCts?.Dispose();
             _aiCts = null;
             await InvokeAsync(StateHasChanged);
