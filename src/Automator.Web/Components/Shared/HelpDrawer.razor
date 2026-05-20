@@ -29,14 +29,16 @@
     protected override void OnInitialized()
     {
         _path = GetPath(Nav.Uri);
+        HelpState.OnChange += OnHelpStateChanged;
         Nav.LocationChanged += OnLocationChanged;
     }
+
+    private void OnHelpStateChanged() => InvokeAsync(StateHasChanged);
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         _path = GetPath(e.Location);
-        HelpState.Close();
-        InvokeAsync(StateHasChanged);
+        HelpState.Close(); // fires OnChange → OnHelpStateChanged handles re-render
     }
 
     private static string GetPath(string uri)
@@ -58,5 +60,9 @@
         _          => @<HelpDashboard Compact="true" />,
     };
 
-    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        HelpState.OnChange -= OnHelpStateChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
 }
