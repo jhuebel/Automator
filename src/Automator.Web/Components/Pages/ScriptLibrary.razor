@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @inject IScriptRunnerService ScriptService
 @inject IAuditLogService AuditService
-@inject IClaudeService Claude
 @inject NavigationManager Nav
 
 <PageTitle>Script Library - Automator</PageTitle>
@@ -11,7 +10,7 @@
     <MudText Typo="Typo.h5" Style="margin: 0;">Script Library</MudText>
     <AuthorizeView Roles="Admin,Developer">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="NewScript">New Script</MudButton>
+                   Href="/scripts/new">New Script</MudButton>
     </AuthorizeView>
 </div>
 
@@ -26,102 +25,6 @@
     Scripts run as the OS user hosting this process and inherit its environment variables.
 </PageHelp>
 
-@if (IsEditing)
-{
-    <MudCard Class="mb-4" Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
-        <MudCardHeader>
-            <CardHeaderContent>
-                <MudText Typo="Typo.h6">@(EditingScript.Id == Guid.Empty ? "New Script" : $"Edit: {EditingScript.Name}")</MudText>
-            </CardHeaderContent>
-        </MudCardHeader>
-        <MudCardContent>
-            <MudGrid Spacing="2">
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="EditingScript.Name" Label="Name" Variant="Variant.Outlined"
-                                  Placeholder="Script name" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudSelect T="ScriptLanguage" @bind-Value="EditingScript.Language" Label="Language"
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        @foreach (var lang in Enum.GetValues<ScriptLanguage>())
-                        {
-                            <MudSelectItem T="ScriptLanguage" Value="@lang">@lang.ToDisplayName()</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudTextField @bind-Value="TagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  Placeholder="e.g. network, diagnostics"
-                                  HelperText="Comma-separated keywords" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="EditingScript.Description" Label="Description"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary); display:block; margin-bottom:4px;">Script Content</MudText>
-                    <CodeEditor @bind-Value="EditingScript.Content" Language="@EditingScript.Language" Height="300px" />
-                </MudItem>
-                @if (Claude.IsConfigured)
-                {
-                <MudItem xs="12">
-                    <MudExpansionPanel Text="AI Assistant" Icon="@Icons.Material.Filled.AutoAwesome" Style="border: 1px solid var(--mud-palette-lines-inputs); border-radius:4px;">
-                        <MudTabs @bind-ActivePanelIndex="_aiMode" Rounded="true" Border="true">
-                            <MudTabPanel Text="Generate" Icon="@Icons.Material.Filled.Add">
-                                <div class="pa-3">
-                                    <MudTextField @bind-Value="_aiPrompt" Label="Describe what the script should do"
-                                                  Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                                </div>
-                            </MudTabPanel>
-                            <MudTabPanel Text="Improve" Icon="@Icons.Material.Filled.Tune">
-                                <div class="pa-3">
-                                    <MudTextField @bind-Value="_aiPrompt" Label="What should be improved or changed?"
-                                                  Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                                </div>
-                            </MudTabPanel>
-                            <MudTabPanel Text="Explain" Icon="@Icons.Material.Filled.HelpOutline">
-                                <div class="pa-3">
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Click Explain to get a plain-language description of the current script.</MudText>
-                                </div>
-                            </MudTabPanel>
-                        </MudTabs>
-                        <div style="display:flex; gap:0.5rem; margin-top:0.75rem; align-items:center;">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_aiRunning"
-                                       StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="RunAi">
-                                @(_aiMode == 0 ? "Generate" : _aiMode == 1 ? "Improve" : "Explain")
-                            </MudButton>
-                            @if (_aiRunning)
-                            {
-                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
-                                <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="CancelAi">Cancel</MudButton>
-                            }
-                        </div>
-                        @if (_aiMode == 2 && !string.IsNullOrEmpty(_aiExplanation))
-                        {
-                            <MudPaper Class="mt-3 pa-3" Elevation="0" Style="background:var(--mud-palette-background-grey); border-radius:4px;">
-                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_aiExplanation</MudText>
-                            </MudPaper>
-                        }
-                        @if (!string.IsNullOrEmpty(_aiError))
-                        {
-                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_aiError</MudAlert>
-                        }
-                    </MudExpansionPanel>
-                </MudItem>
-                }
-            </MudGrid>
-            @if (!string.IsNullOrEmpty(ValidationError))
-            {
-                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@ValidationError</MudAlert>
-            }
-        </MudCardContent>
-        <MudCardActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
-                       OnClick="SaveScript">Save</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
-        </MudCardActions>
-    </MudCard>
-}
 
 <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
     <MudTextField @bind-Value="SearchTerm" Placeholder="Search scripts..." Variant="Variant.Outlined"
@@ -166,7 +69,7 @@
                             </AuthorizeView>
                             <AuthorizeView Roles="Admin,Developer">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
-                                               OnClick="() => EditScript(script)" />
+                                               Href="@($"/scripts/edit/{script.Id}")" />
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
                                                OnClick="() => ConfirmDelete(script)" />
                             </AuthorizeView>
@@ -212,11 +115,6 @@
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private string _username = string.Empty;
-
-    private ScriptDefinition EditingScript { get; set; } = new();
-    private bool IsEditing { get; set; }
-    private string ValidationError { get; set; } = string.Empty;
-    private string TagsText { get; set; } = string.Empty;
     private string SearchTerm { get; set; } = string.Empty;
     private string LanguageFilter { get; set; } = string.Empty;
     private ScriptDefinition? DeletingScript { get; set; }
@@ -237,58 +135,6 @@
                         s.Language.ToString() == LanguageFilter)
             .OrderBy(s => s.Name);
 
-    private void NewScript()
-    {
-        EditingScript = new ScriptDefinition { Id = Guid.Empty };
-        TagsText = string.Empty;
-        ValidationError = string.Empty;
-        IsEditing = true;
-        _aiPrompt = _aiExplanation = _aiError = string.Empty;
-        _aiMode = 0;
-    }
-
-    private void EditScript(ScriptDefinition script)
-    {
-        EditingScript = script.Clone();
-        TagsText = string.Join(", ", script.Tags);
-        ValidationError = string.Empty;
-        IsEditing = true;
-    }
-
-    private void SaveScript()
-    {
-        if (string.IsNullOrWhiteSpace(EditingScript.Name))
-        {
-            ValidationError = "Script name is required.";
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(EditingScript.Content))
-        {
-            ValidationError = "Script content is required.";
-            return;
-        }
-
-        EditingScript.Tags = TagsText
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
-
-        if (EditingScript.Id == Guid.Empty)
-        {
-            EditingScript.Id = Guid.NewGuid();
-            ScriptService.AddScript(EditingScript);
-            _ = AuditService.LogAsync("Script.Created", EditingScript.Name, EditingScript.Language.ToDisplayName(), _username);
-        }
-        else
-        {
-            ScriptService.UpdateScript(EditingScript);
-            _ = AuditService.LogAsync("Script.Updated", EditingScript.Name, EditingScript.Language.ToDisplayName(), _username);
-        }
-
-        IsEditing = false;
-    }
-
-    private void CancelEdit() => IsEditing = false;
-
     private void ConfirmDelete(ScriptDefinition script) => DeletingScript = script;
 
     private void DeleteConfirmed()
@@ -303,81 +149,4 @@
 
     private void RunScript(Guid scriptId) =>
         Nav.NavigateTo($"/runner/{scriptId}");
-
-    // ── AI assistant ─────────────────────────────────────────────────────────
-
-    private int _aiMode;           // 0=Generate  1=Improve  2=Explain
-    private string _aiPrompt      = string.Empty;
-    private string _aiExplanation = string.Empty;
-    private string _aiError       = string.Empty;
-    private bool _aiRunning;
-    private CancellationTokenSource? _aiCts;
-
-    private async Task RunAi()
-    {
-        _aiError = string.Empty;
-        _aiExplanation = string.Empty;
-
-        string system, user;
-        var lang = EditingScript.Language.ToDisplayName();
-
-        switch (_aiMode)
-        {
-            case 0: // Generate
-                if (!string.IsNullOrWhiteSpace(EditingScript.Content))
-                {
-                    // Clear first so the user sees it's regenerating
-                    EditingScript.Content = string.Empty;
-                    await InvokeAsync(StateHasChanged);
-                }
-                system = $"Output ONLY raw {lang} script code with no markdown fences and no explanation.";
-                user   = _aiPrompt;
-                break;
-
-            case 1: // Improve
-                system = $"Output ONLY the improved raw {lang} script code with no markdown fences and no explanation.";
-                user   = $"Script:\n{EditingScript.Content}\n\nInstructions: {_aiPrompt}";
-                EditingScript.Content = string.Empty;
-                await InvokeAsync(StateHasChanged);
-                break;
-
-            default: // Explain
-                system = "You are a helpful assistant. Be concise and clear.";
-                user   = $"Explain what this {lang} script does in plain language suitable for an operator:\n\n{EditingScript.Content}";
-                break;
-        }
-
-        _aiRunning = true;
-        _aiCts = new CancellationTokenSource();
-
-        try
-        {
-            await foreach (var token in Claude.StreamAsync(system, user, _aiCts.Token))
-            {
-                if (_aiMode == 2)
-                    _aiExplanation += token;
-                else
-                    EditingScript.Content += token;
-
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            _aiError = ex.Message;
-        }
-        finally
-        {
-            _aiRunning = false;
-            _aiCts?.Dispose();
-            _aiCts = null;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private void CancelAi()
-    {
-        _aiCts?.Cancel();
-    }
 }
