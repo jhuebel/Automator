@@ -35,6 +35,7 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         _path = GetPath(e.Location);
+        HelpState.Close();
         InvokeAsync(StateHasChanged);
     }
 
