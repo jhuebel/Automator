@@ -24,10 +24,20 @@
         <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.45);">
             Bash · PowerShell · Python · Ansible
         </MudText>
+        <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.25); margin-top: 0.25rem;">
+            v@_version
+        </MudText>
     </div>
 </div>
 
 @code {
+    private static readonly string _version =
+        (typeof(NavMenu).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .FirstOrDefault() as System.Reflection.AssemblyInformationalVersionAttribute)
+            ?.InformationalVersion.Split('+')[0]   // strip git hash suffix if present
+        ?? "1.0.0";
+
     protected override void OnInitialized() =>
         Nav.LocationChanged += OnLocationChanged;
 
