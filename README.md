@@ -9,11 +9,12 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 - **AI assistant** — generate, improve, and explain scripts using Claude (Anthropic API); optional, falls back gracefully when unconfigured
 - **Live Script Runner** — execute scripts and stream output in real time with cancel support
 - **Job Scheduler** — cron-based scheduling with a background service, live next-run preview, and per-job enable/disable
-- **Execution History** — searchable log of every run with exit codes and full output
+- **Execution History** — log of every run with exit codes and full output
 - **Role-based access control** — Admin, Developer, Operator, and Viewer roles
 - **User management** — create, edit, and disable users from the Settings page
 - **Audit log** — tamper-evident record of all create/edit/delete/run actions
 - **System status** — runtime dependency checks and database statistics
+- **Comprehensive help system** — dedicated `/help` page, context-sensitive slide-out drawer (accessible from the `?` button in the header), and inline help throughout
 - **Persistent storage** — all scripts, jobs, and history survive restarts (SQLite)
 
 ## Supported Script Languages
@@ -106,8 +107,8 @@ Automator/
 │   └── Automator.Web/
 │       ├── Components/
 │       │   ├── Layout/         # Shell layout, nav sidebar, header
-│       │   ├── Pages/          # Dashboard, Script Library, Runner, History, Jobs, Settings
-│       │   └── Shared/         # UserManagementPanel, SystemStatusPanel, CodeEditor, PageHelp, HelpIcon
+│       │   ├── Pages/          # Dashboard, Script Library, Runner, History, Jobs, Settings, Help
+│       │   └── Shared/         # CodeEditor, HelpDrawer, Help sections, PageHelp, HelpIcon, UserManagementPanel, SystemStatusPanel
 │       ├── Data/
 │       │   ├── AutomatorDbContext.cs   # EF Core context (Scripts, ExecutionHistory, ScheduledJobs, Settings, AuditLogs)
 │       │   └── DataSeeder.cs           # First-run role, user, and settings seeding
@@ -118,7 +119,8 @@ Automator/
 │       │   ├── SchedulerBackgroundService  # 15s tick, fires due jobs
 │       │   ├── AuditLogService             # Writes audit entries to DB
 │       │   ├── ClaudeService               # Anthropic API client with SSE streaming
-│       │   └── DependencyCheckService      # Probes runtimes for System Status page
+│       │   ├── DependencyCheckService      # Probes runtimes for System Status page
+│       │   └── HelpDrawerState             # Scoped state service for the help drawer
 │       └── wwwroot/
 │           └── lib/codemirror/             # CodeMirror 5 — vendored, no CDN dependency
 └── Automator.sln
