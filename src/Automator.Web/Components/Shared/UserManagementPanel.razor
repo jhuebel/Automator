@@ -1,0 +1,261 @@
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<PageHelp>
+    <strong>Role access levels:</strong>
+    <ul class="mb-0 mt-1 ps-3">
+        <li><strong>Admin</strong> — full access: manage users, create/edit/delete scripts, manage jobs, and run scripts</li>
+        <li><strong>Operator</strong> — run scripts and manage scheduled jobs; cannot edit scripts or manage users</li>
+        <li><strong>Viewer</strong> — read-only: browse scripts, view history, and check system status</li>
+    </ul>
+    You cannot change your own role or delete your own account.
+</PageHelp>
+
+<div class="d-flex justify-content-end mb-3">
+    <button class="btn btn-primary" @onclick="() => { IsAdding = true; ClearForm(); }">
+        <i class="bi bi-person-plus-fill me-1"></i>Add User
+    </button>
+</div>
+
+@if (IsAdding)
+{
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white fw-semibold">New User</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Username</label>
+                    <input class="form-control" @bind="NewUsername" placeholder="username" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Email</label>
+                    <input class="form-control" @bind="NewEmail" placeholder="user@example.com" type="email" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Password</label>
+                    <input class="form-control" @bind="NewPassword" type="password" placeholder="Min 8 characters" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold">Role</label>
+                    <select class="form-select" @bind="NewRole">
+                        @foreach (var role in AvailableRoles)
+                        {
+                            <option value="@role">@role</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(FormError))
+            {
+                <div class="alert alert-danger py-2 mt-3 small">@FormError</div>
+            }
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary" @onclick="CreateUserAsync">
+                    <i class="bi bi-person-check me-1"></i>Create
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="() => IsAdding = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (UserList is null)
+{
+    <div class="d-flex align-items-center gap-2 text-muted">
+        <span class="spinner-border spinner-border-sm"></span> Loading users...
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Roles</th>
+                    <th>Lockout</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in UserList)
+                {
+                    <tr>
+                        <td class="fw-semibold">
+                            @user.UserName
+                            @if (user.Id == CurrentUserId)
+                            {
+                                <span class="badge bg-secondary ms-1">you</span>
+                            }
+                        </td>
+                        <td class="text-muted small">@user.Email</td>
+                        <td>
+                            @foreach (var role in user.Roles)
+                            {
+                                <span class="badge @RoleBadgeClass(role) me-1">@role</span>
+                            }
+                        </td>
+                        <td>
+                            @if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+                            {
+                                <span class="badge bg-warning text-dark">Locked</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1 align-items-center">
+                                <select class="form-select form-select-sm" style="width: auto;"
+                                        value="@user.Roles.FirstOrDefault()"
+                                        @onchange="e => ChangeRoleAsync(user, e.Value?.ToString())">
+                                    @foreach (var role in AvailableRoles)
+                                    {
+                                        <option value="@role" selected="@user.Roles.Contains(role)">@role</option>
+                                    }
+                                </select>
+                                @if (user.Id != CurrentUserId)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            title="Delete user"
+                                            @onclick="() => ConfirmDeleteUser(user)">
+                                        <i class="bi bi-person-x"></i>
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="text-muted small">@UserList.Count user(s) total</div>
+}
+
+@if (DeletingUser is not null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                </div>
+                <div class="modal-body">
+                    Delete user <strong>@DeletingUser.UserName</strong>? This cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-danger" @onclick="DeleteUserConfirmedAsync">Delete</button>
+                    <button class="btn btn-secondary" @onclick="() => DeletingUser = null">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private List<UserViewModel>? UserList { get; set; }
+    private List<string> AvailableRoles { get; set; } = [];
+    private string? CurrentUserId { get; set; }
+    private UserViewModel? DeletingUser { get; set; }
+
+    private bool IsAdding { get; set; }
+    private string NewUsername { get; set; } = string.Empty;
+    private string NewEmail { get; set; } = string.Empty;
+    private string NewPassword { get; set; } = string.Empty;
+    private string NewRole { get; set; } = "Viewer";
+    private string FormError { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var auth = await AuthState;
+            CurrentUserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        AvailableRoles = RoleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToList();
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        var list = new List<UserViewModel>();
+        foreach (var user in UserManager.Users.ToList())
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            list.Add(new UserViewModel(user.Id, user.UserName!, user.Email!, [.. roles], user.LockoutEnd));
+        }
+        UserList = [.. list.OrderBy(u => u.UserName)];
+    }
+
+    private async Task CreateUserAsync()
+    {
+        FormError = string.Empty;
+        if (string.IsNullOrWhiteSpace(NewUsername) || string.IsNullOrWhiteSpace(NewPassword))
+        {
+            FormError = "Username and password are required.";
+            return;
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = NewUsername.Trim(),
+            Email = NewEmail.Trim(),
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(user, NewPassword);
+        if (!result.Succeeded)
+        {
+            FormError = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        await UserManager.AddToRoleAsync(user, NewRole);
+        IsAdding = false;
+        await LoadUsersAsync();
+    }
+
+    private async Task ChangeRoleAsync(UserViewModel user, string? newRole)
+    {
+        if (string.IsNullOrEmpty(newRole)) return;
+        var appUser = await UserManager.FindByIdAsync(user.Id);
+        if (appUser is null) return;
+
+        var currentRoles = await UserManager.GetRolesAsync(appUser);
+        await UserManager.RemoveFromRolesAsync(appUser, currentRoles);
+        await UserManager.AddToRoleAsync(appUser, newRole);
+        await LoadUsersAsync();
+    }
+
+    private void ConfirmDeleteUser(UserViewModel user) => DeletingUser = user;
+
+    private async Task DeleteUserConfirmedAsync()
+    {
+        if (DeletingUser is null) return;
+        var user = await UserManager.FindByIdAsync(DeletingUser.Id);
+        if (user is not null) await UserManager.DeleteAsync(user);
+        DeletingUser = null;
+        await LoadUsersAsync();
+    }
+
+    private void ClearForm()
+    {
+        NewUsername = NewEmail = NewPassword = FormError = string.Empty;
+        NewRole = "Viewer";
+    }
+
+    private static string RoleBadgeClass(string role) => role switch
+    {
+        "Admin" => "bg-danger",
+        "Operator" => "bg-primary",
+        "Viewer" => "bg-secondary",
+        _ => "bg-dark"
+    };
+
+    private record UserViewModel(string Id, string UserName, string Email, List<string> Roles, DateTimeOffset? LockoutEnd);
+}
