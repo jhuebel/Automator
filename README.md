@@ -5,6 +5,7 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 ## Features
 
 - **Script Library** — store, organize, and version Bash, PowerShell, Python, and Ansible scripts
+- **Dedicated script editor** — full-page editor that expands to fill the viewport; unsaved-changes guard prevents accidental navigation away
 - **Syntax-highlighted editor** — CodeMirror 5 editor with per-language highlighting and read-only source viewers
 - **AI assistant** — generate, improve, and explain scripts using Claude (Anthropic API); optional, falls back gracefully when unconfigured
 - **Live Script Runner** — execute scripts and stream output in real time with cancel support
@@ -75,7 +76,7 @@ dotnet run --project src/Automator.Web
 
 Open **http://localhost:5000** in your browser.
 
-On first run the app creates `automator.db` in the project directory, seeds the four roles, and creates default users for each role (see table below). Change these credentials immediately in a production deployment.
+On first run the app creates `automator.db` in the project directory, seeds the four roles, and creates default users for each role (see table below). **Change these credentials immediately in a production deployment.**
 
 | Username | Password | Role |
 |---|---|---|
@@ -107,7 +108,7 @@ Automator/
 │   └── Automator.Web/
 │       ├── Components/
 │       │   ├── Layout/         # Shell layout, nav sidebar, header
-│       │   ├── Pages/          # Dashboard, Script Library, Runner, History, Jobs, Settings, Help
+│       │   ├── Pages/          # Dashboard, Script Library, ScriptEditor, Runner, History, Jobs, Settings, Help
 │       │   └── Shared/         # CodeEditor, HelpDrawer, Help sections, PageHelp, HelpIcon, UserManagementPanel, SystemStatusPanel
 │       ├── Data/
 │       │   ├── AutomatorDbContext.cs   # EF Core context (Scripts, ExecutionHistory, ScheduledJobs, Settings, AuditLogs)
