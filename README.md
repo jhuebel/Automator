@@ -100,6 +100,26 @@ By default `automator.db` is created in the working directory. To change it:
 }
 ```
 
+### Using MySQL or MariaDB
+
+Set `DatabaseProvider` to `MySQL` (also accepted: `MariaDB`) and provide a standard connection string:
+
+```json
+"DatabaseProvider": "MySQL",
+"ConnectionStrings": {
+  "DefaultConnection": "Server=localhost;Database=automator;User=automator;Password=secret;"
+}
+```
+
+The database and user must exist before first run; Automator creates all tables automatically. The MySQL user needs `CREATE`, `ALTER`, `INDEX`, `SELECT`, `INSERT`, `UPDATE`, and `DELETE` privileges on the database.
+
+Or via environment variables (useful in containers):
+
+```bash
+DatabaseProvider=MySQL
+ConnectionStrings__DefaultConnection="Server=db;Database=automator;User=automator;Password=secret;"
+```
+
 ## Project Structure
 
 ```
@@ -145,7 +165,7 @@ Jobs use standard 5-field cron syntax: `minute hour day month day-of-week`
 - [ASP.NET Core 9](https://learn.microsoft.com/aspnet/core) — web framework
 - [Blazor Server](https://learn.microsoft.com/aspnet/core/blazor) — interactive UI with real-time output streaming
 - [ASP.NET Core Identity](https://learn.microsoft.com/aspnet/core/security/authentication/identity) — authentication and role-based authorization
-- [Entity Framework Core 9 + SQLite](https://learn.microsoft.com/ef/core) — persistent storage, no external database required
+- [Entity Framework Core 9](https://learn.microsoft.com/ef/core) — persistent storage via SQLite (default, no server required) or MySQL/MariaDB
 - [MudBlazor 9](https://mudblazor.com) — component library
 - [Chart.js 4](https://www.chartjs.org) — dashboard execution chart
 - [CodeMirror 5](https://codemirror.net/5/) — syntax-highlighted script editor and source viewers (vendored locally)

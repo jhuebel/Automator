@@ -9,6 +9,14 @@ using MudBlazor.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseStaticWebAssets();
 
+var dbProvider = (builder.Configuration["DatabaseProvider"] ?? "Sqlite").Trim();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=automator.db";
+var isMySql = dbProvider.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
+           || dbProvider.Equals("MariaDB", StringComparison.OrdinalIgnoreCase);
+
+// Detect MySQL/MariaDB server version once at startup (requires a brief connection)
+ServerVersion? mySqlVersion = isMySql ? ServerVersion.AutoDetect(connectionString) : null;
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -18,7 +26,12 @@ builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions
 builder.Services.AddRazorPages();
 
 builder.Services.AddDbContextFactory<AutomatorDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    if (isMySql)
+        options.UseMySql(connectionString, mySqlVersion!);
+    else
+        options.UseSqlite(connectionString);
+});
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
@@ -61,49 +74,61 @@ using (var scope = app.Services.CreateScope())
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AutomatorDbContext>>();
     using var db = factory.CreateDbContext();
 
-    try
+    if (!isMySql)
     {
-        // Probe for Identity tables — if missing, schema needs to be rebuilt
-        db.Users.FirstOrDefault();
-    }
-    catch (Microsoft.Data.Sqlite.SqliteException)
-    {
-        db.Database.EnsureDeleted();
+        // SQLite: probe for Identity tables; if missing the schema needs to be rebuilt
+        try { db.Users.FirstOrDefault(); }
+        catch (Microsoft.Data.Sqlite.SqliteException) { db.Database.EnsureDeleted(); }
     }
 
     db.Database.EnsureCreated();
 
-    // Add Settings table for existing databases that predate this schema change
-    db.Database.ExecuteSqlRaw("""
-        CREATE TABLE IF NOT EXISTS "Settings" (
-            "Id"                       INTEGER NOT NULL CONSTRAINT "PK_Settings" PRIMARY KEY,
-            "ExecutionTimeoutSeconds"  INTEGER NOT NULL DEFAULT 300,
-            "MaxConcurrentExecutions"  INTEGER NOT NULL DEFAULT 5,
-            "MaxHistoryRecords"        INTEGER NOT NULL DEFAULT 1000
-        )
-        """);
+    if (!isMySql)
+    {
+        // SQLite: ensure tables added after initial release exist in older databases
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "Settings" (
+                "Id"                       INTEGER NOT NULL CONSTRAINT "PK_Settings" PRIMARY KEY,
+                "ExecutionTimeoutSeconds"  INTEGER NOT NULL DEFAULT 300,
+                "MaxConcurrentExecutions"  INTEGER NOT NULL DEFAULT 5,
+                "MaxHistoryRecords"        INTEGER NOT NULL DEFAULT 1000
+            )
+            """);
 
-    // Add AuditLogs table for existing databases
-    db.Database.ExecuteSqlRaw("""
-        CREATE TABLE IF NOT EXISTS "AuditLogs" (
-            "Id"        INTEGER NOT NULL CONSTRAINT "PK_AuditLogs" PRIMARY KEY AUTOINCREMENT,
-            "Timestamp" TEXT    NOT NULL,
-            "Username"  TEXT    NULL,
-            "Action"    TEXT    NOT NULL,
-            "Resource"  TEXT    NULL,
-            "Details"   TEXT    NULL
-        )
-        """);
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "AuditLogs" (
+                "Id"        INTEGER NOT NULL CONSTRAINT "PK_AuditLogs" PRIMARY KEY AUTOINCREMENT,
+                "Timestamp" TEXT    NOT NULL,
+                "Username"  TEXT    NULL,
+                "Action"    TEXT    NOT NULL,
+                "Resource"  TEXT    NULL,
+                "Details"   TEXT    NULL
+            )
+            """);
 
-    // Add AI settings columns for existing databases (EnsureCreated won't ALTER existing tables)
-    var settingsCols = db.Database
-        .SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Settings')")
-        .ToList();
-    if (!settingsCols.Contains("AnthropicApiKey"))
-        db.Database.ExecuteSqlRaw("ALTER TABLE Settings ADD COLUMN AnthropicApiKey TEXT NULL");
-    if (!settingsCols.Contains("AnthropicModel"))
-        db.Database.ExecuteSqlRaw(
-            "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+        // EnsureCreated won't ALTER existing tables — add missing columns manually
+        var settingsCols = db.Database
+            .SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Settings')")
+            .ToList();
+        if (!settingsCols.Contains("AnthropicApiKey"))
+            db.Database.ExecuteSqlRaw("ALTER TABLE Settings ADD COLUMN AnthropicApiKey TEXT NULL");
+        if (!settingsCols.Contains("AnthropicModel"))
+            db.Database.ExecuteSqlRaw(
+                "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+    }
+    else
+    {
+        // MySQL/MariaDB: EnsureCreated handles table creation; add missing columns for older databases
+        var settingsCols = db.Database
+            .SqlQueryRaw<string>(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Settings'")
+            .ToList();
+        if (!settingsCols.Any(c => c.Equals("AnthropicApiKey", StringComparison.OrdinalIgnoreCase)))
+            db.Database.ExecuteSqlRaw("ALTER TABLE `Settings` ADD COLUMN `AnthropicApiKey` TEXT NULL");
+        if (!settingsCols.Any(c => c.Equals("AnthropicModel", StringComparison.OrdinalIgnoreCase)))
+            db.Database.ExecuteSqlRaw(
+                "ALTER TABLE `Settings` ADD COLUMN `AnthropicModel` TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+    }
 
     var orphaned = db.ExecutionHistory.Where(r => r.CompletedAt == null).ToList();
     foreach (var r in orphaned)
