@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 @inject IJobSchedulerService Scheduler
+@inject IJSRuntime JS
 
 <PageTitle>Dashboard - Automator</PageTitle>
 
@@ -157,8 +158,46 @@
     </div>
 </div>
 
+<div class="card mt-4">
+    <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-graph-up me-2"></i>Executions Over Time</span>
+        <span class="text-muted small">Last 14 days</span>
+    </div>
+    <div class="card-body" style="height: 260px; position: relative;">
+        <canvas id="executionChart"></canvas>
+    </div>
+</div>
+
 @code {
     private int SuccessCount => ScriptService.ExecutionHistory.Count(r => !r.IsRunning && r.IsSuccess);
     private int FailureCount => ScriptService.ExecutionHistory.Count(r => !r.IsRunning && !r.IsSuccess);
     private int RunningCount => ScriptService.ExecutionHistory.Count(r => r.IsRunning);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var history = ScriptService.ExecutionHistory
+            .Where(r => !r.IsRunning)
+            .ToList();
+
+        var today = DateTime.UtcNow.Date;
+        var labels = new List<string>();
+        var total   = new List<int>();
+        var success = new List<int>();
+        var failed  = new List<int>();
+
+        for (int i = 13; i >= 0; i--)
+        {
+            var date = today.AddDays(-i);
+            var day = history.Where(r => r.StartedAt.Date == date).ToList();
+            labels.Add(date.ToString("MMM d"));
+            total.Add(day.Count);
+            success.Add(day.Count(r => r.IsSuccess));
+            failed.Add(day.Count(r => !r.IsSuccess));
+        }
+
+        await JS.InvokeVoidAsync("blazorCharts.renderExecutionChart",
+            "executionChart", labels, total, success, failed);
+    }
 }
