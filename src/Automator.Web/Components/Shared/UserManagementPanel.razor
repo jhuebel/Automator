@@ -1,6 +1,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
 @inject IAuditLogService AuditService
+@inject IConfiguration Configuration
 
 <PageHelp>
     <strong>Role access levels:</strong>
@@ -89,6 +90,10 @@ else
                             {
                                 <span class="badge bg-secondary ms-1">you</span>
                             }
+                            @if (user.UserName == ProtectedUsername)
+                            {
+                                <span class="badge bg-danger ms-1">protected</span>
+                            }
                         </td>
                         <td class="text-muted small">@user.Email</td>
                         <td>
@@ -108,16 +113,20 @@ else
                             }
                         </td>
                         <td>
+                            @{
+                                var isProtected = user.UserName == ProtectedUsername || user.Id == CurrentUserId;
+                            }
                             <div class="d-flex gap-1 align-items-center">
                                 <select class="form-select form-select-sm" style="width: auto;"
                                         value="@user.Roles.FirstOrDefault()"
+                                        disabled="@isProtected"
                                         @onchange="e => ChangeRoleAsync(user, e.Value?.ToString())">
                                     @foreach (var role in AvailableRoles)
                                     {
                                         <option value="@role" selected="@user.Roles.Contains(role)">@role</option>
                                     }
                                 </select>
-                                @if (user.Id != CurrentUserId)
+                                @if (!isProtected)
                                 {
                                     <button class="btn btn-sm btn-outline-danger"
                                             title="Delete user"
@@ -158,6 +167,8 @@ else
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    private string ProtectedUsername { get; set; } = "admin";
+
     private List<UserViewModel>? UserList { get; set; }
     private List<string> AvailableRoles { get; set; } = [];
     private string? CurrentUserId { get; set; }
@@ -180,6 +191,7 @@ else
             CurrentUsername = auth.User.Identity?.Name ?? string.Empty;
         }
 
+        ProtectedUsername = Configuration["DefaultAdmin:Username"] ?? "admin";
         AvailableRoles = RoleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToList();
         await LoadUsersAsync();
     }
