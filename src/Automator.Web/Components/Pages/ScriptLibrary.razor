@@ -1,165 +1,161 @@
 @page "/scripts"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 @inject IAuditLogService AuditService
 @inject NavigationManager Nav
 
 <PageTitle>Script Library - Automator</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <h4 class="mb-0">Script Library</h4>
-    <AuthorizeView Roles="Admin">
-        <button class="btn btn-primary" @onclick="NewScript">
-            <i class="bi bi-plus-lg me-1"></i>New Script
-        </button>
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+    <MudText Typo="Typo.h5" Style="margin: 0;">Script Library</MudText>
+    <AuthorizeView Roles="Admin,Developer">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NewScript">New Script</MudButton>
     </AuthorizeView>
 </div>
 
 <PageHelp>
     <strong>Script Library</strong> is a persistent collection of automation scripts.
-    <ul class="mb-0 mt-1 ps-3">
+    <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem;">
         <li><strong>Viewer:</strong> browse scripts and view source</li>
         <li><strong>Operator:</strong> run scripts via the Run Script page</li>
-        <li><strong>Admin:</strong> create, edit, and delete scripts</li>
+        <li><strong>Developer:</strong> create, edit, and delete scripts; run scripts</li>
+        <li><strong>Admin:</strong> all of the above</li>
     </ul>
     Scripts run as the OS user hosting this process and inherit its environment variables.
 </PageHelp>
 
 @if (IsEditing)
 {
-    <div class="card mb-4 border-primary">
-        <div class="card-header bg-primary text-white fw-semibold">
-            @(EditingScript.Id == Guid.Empty ? "New Script" : $"Edit: {EditingScript.Name}")
-        </div>
-        <div class="card-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold">Name</label>
-                    <input class="form-control" @bind="EditingScript.Name" placeholder="Script name" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Language <HelpIcon Text="The interpreter used to execute this script. Must be installed on the host — check System Status if unsure." /></label>
-                    <select class="form-select" @bind="EditingScript.Language">
+    <MudCard Class="mb-4" Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">@(EditingScript.Id == Guid.Empty ? "New Script" : $"Edit: {EditingScript.Name}")</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="EditingScript.Name" Label="Name" Variant="Variant.Outlined"
+                                  Placeholder="Script name" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudSelect T="ScriptLanguage" @bind-Value="EditingScript.Language" Label="Language"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
                         @foreach (var lang in Enum.GetValues<ScriptLanguage>())
                         {
-                            <option value="@lang">@lang.ToDisplayName()</option>
+                            <MudSelectItem T="ScriptLanguage" Value="@lang">@lang.ToDisplayName()</MudSelectItem>
                         }
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Tags <HelpIcon Text="Comma-separated keywords for filtering. Example: production, network, disk, windows" /></label>
-                    <input class="form-control" value="@TagsText"
-                           @onchange="e => TagsText = e.Value?.ToString() ?? string.Empty"
-                           placeholder="e.g. network, diagnostics" />
-                </div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Description</label>
-                <input class="form-control" @bind="EditingScript.Description" placeholder="Brief description" />
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Script Content <HelpIcon Text="The full script body. No shebang line needed — the interpreter is set by the Language field. The process inherits the host's environment variables." /></label>
-                <textarea class="form-control font-monospace" rows="12"
-                          @bind="EditingScript.Content"
-                          placeholder="Enter your script here..."></textarea>
-            </div>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="TagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Placeholder="e.g. network, diagnostics"
+                                  HelperText="Comma-separated keywords" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="EditingScript.Description" Label="Description"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="EditingScript.Content" Label="Script Content"
+                                  Variant="Variant.Outlined" Lines="12" Class="font-monospace"
+                                  Placeholder="Enter your script here..." />
+                </MudItem>
+            </MudGrid>
             @if (!string.IsNullOrEmpty(ValidationError))
             {
-                <div class="alert alert-danger py-2">@ValidationError</div>
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@ValidationError</MudAlert>
             }
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" @onclick="SaveScript">
-                    <i class="bi bi-floppy me-1"></i>Save
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
-            </div>
-        </div>
-    </div>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveScript">Save</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
 }
 
-<div class="mb-3 d-flex gap-2 align-items-center">
-    <input class="form-control" style="max-width: 300px;"
-           placeholder="Search scripts..."
-           @bind="SearchTerm" @bind:event="oninput" />
-    <select class="form-select" style="max-width: 180px;" @bind="LanguageFilter">
-        <option value="">All languages</option>
+<div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
+    <MudTextField @bind-Value="SearchTerm" Placeholder="Search scripts..." Variant="Variant.Outlined"
+                  Margin="Margin.Dense" Immediate="true" Style="max-width: 280px;"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+    <MudSelect T="string" @bind-Value="LanguageFilter" Label="Language" Variant="Variant.Outlined"
+               Margin="Margin.Dense" Style="max-width: 180px;" AnchorOrigin="Origin.BottomLeft">
+        <MudSelectItem T="string" Value="@string.Empty">All languages</MudSelectItem>
         @foreach (var lang in Enum.GetValues<ScriptLanguage>())
         {
-            <option value="@lang">@lang.ToDisplayName()</option>
+            <MudSelectItem T="string" Value="@lang.ToString()">@lang.ToDisplayName()</MudSelectItem>
         }
-    </select>
+    </MudSelect>
 </div>
 
-<div class="row g-3">
+<MudGrid Spacing="2">
     @foreach (var script in FilteredScripts)
     {
-        <div class="col-12">
-            <div class="card h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-start justify-content-between gap-2">
-                        <div class="flex-grow-1">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                                <h6 class="mb-0 fw-semibold">@script.Name</h6>
-                                <span class="badge @script.Language.ToBadgeClass()">@script.Language.ToDisplayName()</span>
+        <MudItem xs="12">
+            <MudCard Elevation="1">
+                <MudCardContent>
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
+                                <MudText Typo="Typo.body1" Style="font-weight: 600;">@script.Name</MudText>
+                                <MudChip T="string" Color="@script.Language.ToColor()" Size="Size.Small">@script.Language.ToDisplayName()</MudChip>
                                 @foreach (var tag in script.Tags)
                                 {
-                                    <span class="badge bg-secondary">@tag</span>
+                                    <MudChip T="string" Color="Color.Default" Size="Size.Small">@tag</MudChip>
                                 }
                             </div>
                             @if (!string.IsNullOrEmpty(script.Description))
                             {
-                                <p class="text-muted small mb-1">@script.Description</p>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">@script.Description</MudText>
                             }
-                            <small class="text-muted">Updated @script.UpdatedAt.ToLocalTime().ToString("g")</small>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Updated @script.UpdatedAt.ToLocalTime().ToString("g")</MudText>
                         </div>
-                        <div class="d-flex gap-1 flex-shrink-0">
-                            <AuthorizeView Roles="Admin,Operator">
-                                <button class="btn btn-sm btn-success" @onclick="() => RunScript(script.Id)" title="Run">
-                                    <i class="bi bi-play-fill"></i>
-                                </button>
+                        <div style="display: flex; gap: 0.25rem; flex-shrink: 0;">
+                            <AuthorizeView Roles="Admin,Developer,Operator">
+                                <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success" Size="Size.Small"
+                                               OnClick="() => RunScript(script.Id)" />
                             </AuthorizeView>
-                            <AuthorizeView Roles="Admin">
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EditScript(script)" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(script)" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                            <AuthorizeView Roles="Admin,Developer">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                               OnClick="() => EditScript(script)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                               OnClick="() => ConfirmDelete(script)" />
                             </AuthorizeView>
                         </div>
                     </div>
-                    <details class="mt-2">
-                        <summary class="text-muted small" style="cursor: pointer;">View source</summary>
-                        <pre class="bg-dark text-light p-2 mt-2 rounded small" style="max-height: 200px; overflow: auto;">@script.Content</pre>
+                    <details style="margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; color: var(--mud-palette-text-secondary); font-size: 0.8125rem;">View source</summary>
+                        <pre class="output-terminal" style="border-radius: 4px; min-height: unset; max-height: 200px; margin-top: 0.5rem;">@script.Content</pre>
                     </details>
-                </div>
-            </div>
-        </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
     }
     @if (!FilteredScripts.Any())
     {
-        <div class="col-12 text-muted">No scripts match your search.</div>
+        <MudItem xs="12">
+            <MudText Color="Color.Secondary">No scripts match your search.</MudText>
+        </MudItem>
     }
-</div>
+</MudGrid>
 
 @if (DeletingScript is not null)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                </div>
-                <div class="modal-body">
-                    Delete <strong>@DeletingScript.Name</strong>? This cannot be undone.
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="DeleteConfirmed">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => DeletingScript = null">Cancel</button>
-                </div>
-            </div>
-        </div>
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudCard Style="width: 380px;">
+            <MudCardHeader>
+                <CardHeaderContent><MudText Typo="Typo.h6">Confirm Delete</MudText></CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                Delete <strong>@DeletingScript.Name</strong>? This cannot be undone.
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteConfirmed">Delete</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="() => DeletingScript = null">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
     </div>
 }
 
@@ -248,10 +244,9 @@
     {
         if (DeletingScript is not null)
         {
-            var name = DeletingScript.Name;
             ScriptService.DeleteScript(DeletingScript.Id);
+            _ = AuditService.LogAsync("Script.Deleted", DeletingScript.Name, null, _username);
             DeletingScript = null;
-            _ = AuditService.LogAsync("Script.Deleted", name, null, _username);
         }
     }
 

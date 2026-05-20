@@ -1,173 +1,141 @@
 @page "/settings"
 @attribute [Authorize(Roles = "Admin")]
-@rendermode InteractiveServer
 @inject IDbContextFactory<AutomatorDbContext> DbFactory
 @inject IAuditLogService AuditService
 @inject NavigationManager Nav
 
 <PageTitle>Settings - Automator</PageTitle>
 
-<style>
-    .nav-tabs button.nav-link.active { color: var(--bs-body-color, #212529) !important; }
-</style>
+<MudText Typo="Typo.h5" Class="mb-3">Settings</MudText>
 
-<h4 class="mb-3">Settings</h4>
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4"
+         @bind-ActivePanelIndex="_activePanelIndex" @bind-ActivePanelIndex:after="OnTabChanged">
+    <MudTabPanel Text="Application" Icon="@Icons.Material.Filled.Tune">
+        <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                Tune runtime behaviour. Timeout and history changes take effect immediately; concurrency changes require a restart.
+            </PageHelp>
+            <div style="max-width: 500px;">
+                @if (AppSettings is not null)
+                {
+                    <MudCard Elevation="1">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Small" />
+                                    <MudText Typo="Typo.h6">Application Settings</MudText>
+                                </div>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudNumericField T="int" @bind-Value="AppSettings.ExecutionTimeoutSeconds"
+                                            Label="Execution Timeout (seconds)"
+                                            HelperText="Max seconds a script may run before auto-cancel. Default: 300."
+                                            Min="10" Max="3600" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                            Class="mb-3" Adornment="Adornment.End" AdornmentText="s" />
+                            <MudNumericField T="int" @bind-Value="AppSettings.MaxConcurrentExecutions"
+                                            Label="Max Concurrent Executions"
+                                            HelperText="How many scripts may run simultaneously. Requires restart. Default: 5."
+                                            Min="1" Max="20" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                            Class="mb-3" Style="max-width: 200px;" />
+                            <MudNumericField T="int" @bind-Value="AppSettings.MaxHistoryRecords"
+                                            Label="History Retention (records)"
+                                            HelperText="Number of recent executions shown in History. Default: 1000."
+                                            Min="10" Max="10000" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                            Class="mb-2" Adornment="Adornment.End" AdornmentText="records" />
+                            @if (!string.IsNullOrEmpty(AppSettingsMessage))
+                            {
+                                <MudAlert Severity="@(AppSettingsSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">@AppSettingsMessage</MudAlert>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="SaveAppSettingsAsync" Disabled="@IsSavingAppSettings">Save</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                }
+            </div>
+        </div>
+    </MudTabPanel>
 
-<ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <button type="button" class="nav-link @(ActiveTab == "application" ? "active" : "")" @onclick='() => ActiveTab = "application"'>
-            <i class="bi bi-sliders me-1"></i>Application
-        </button>
-    </li>
-    <li class="nav-item">
-        <button type="button" class="nav-link @(ActiveTab == "users" ? "active" : "")" @onclick='() => ActiveTab = "users"'>
-            <i class="bi bi-people-fill me-1"></i>Users
-        </button>
-    </li>
-    <li class="nav-item">
-        <button type="button" class="nav-link @(ActiveTab == "status" ? "active" : "")" @onclick='() => ActiveTab = "status"'>
-            <i class="bi bi-heart-pulse me-1"></i>System Status
-        </button>
-    </li>
-    <li class="nav-item">
-        <button type="button" class="nav-link @(ActiveTab == "audit" ? "active" : "")" @onclick='() => { ActiveTab = "audit"; LoadAuditLogs(); }'>
-            <i class="bi bi-journal-text me-1"></i>Audit Logs
-        </button>
-    </li>
-</ul>
+    <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.Group">
+        <div style="padding: 1.5rem 0;">
+            <UserManagementPanel />
+        </div>
+    </MudTabPanel>
 
-@if (ActiveTab == "application")
-{
-    <PageHelp>
-        Tune runtime behaviour. Timeout and history changes take effect immediately; concurrency changes require a restart.
-    </PageHelp>
-    <div class="row">
-        <div class="col-lg-5 col-md-7">
-            @if (AppSettings is not null)
+    <MudTabPanel Text="System Status" Icon="@Icons.Material.Filled.Monitor">
+        <div style="padding: 1.5rem 0;">
+            <SystemStatusPanel />
+        </div>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Audit Logs" Icon="@Icons.Material.Filled.ListAlt">
+        <div style="padding: 1.5rem 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <MudSelect T="string" @bind-Value="AuditFilter" @bind-Value:after="FilterLogs"
+                           Label="Filter by action" Variant="Variant.Outlined" Margin="Margin.Dense"
+                           Style="max-width: 200px;" AnchorOrigin="Origin.BottomLeft">
+                    @foreach (var opt in AuditFilterOptions)
+                    {
+                        <MudSelectItem T="string" Value="@opt.Value">@opt.Label</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh"
+                           Size="Size.Small" OnClick="LoadAuditLogs">Refresh</MudButton>
+            </div>
+
+            @if (AuditLogs is null)
             {
-                <div class="card">
-                    <div class="card-header fw-semibold">
-                        <i class="bi bi-sliders me-2"></i>Application Settings
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Execution Timeout
-                                <HelpIcon Text="Maximum seconds a script may run before it is automatically cancelled. Default: 300 (5 minutes)." />
-                            </label>
-                            <div class="input-group" style="max-width: 200px;">
-                                <input class="form-control" type="number" @bind="AppSettings.ExecutionTimeoutSeconds" min="10" max="3600" />
-                                <span class="input-group-text">s</span>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Max Concurrent Executions
-                                <HelpIcon Text="How many scripts may run at the same time. Requires a restart to take effect. Default: 5." />
-                            </label>
-                            <input class="form-control" type="number" @bind="AppSettings.MaxConcurrentExecutions" min="1" max="20" style="max-width: 100px;" />
-                            <div class="form-text">Requires restart to take effect.</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                History Retention
-                                <HelpIcon Text="Number of recent execution records shown in History. Older records stay in the database. Default: 1000." />
-                            </label>
-                            <div class="input-group" style="max-width: 200px;">
-                                <input class="form-control" type="number" @bind="AppSettings.MaxHistoryRecords" min="10" max="10000" />
-                                <span class="input-group-text">records</span>
-                            </div>
-                        </div>
-
-                        <button class="btn btn-primary" @onclick="SaveAppSettingsAsync" disabled="@IsSavingAppSettings">
-                            <i class="bi bi-floppy me-1"></i>Save
-                        </button>
-                        @if (!string.IsNullOrEmpty(AppSettingsMessage))
-                        {
-                            <div class="alert @(AppSettingsSuccess ? "alert-success" : "alert-danger") py-2 small mt-2 mb-0">@AppSettingsMessage</div>
-                        }
-                    </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <MudText Color="Color.Secondary">Loading logs...</MudText>
                 </div>
             }
+            else if (!AuditLogs.Any())
+            {
+                <MudText Color="Color.Secondary">No audit log entries found.</MudText>
+            }
+            else
+            {
+                <MudPaper Elevation="1" Class="overflow-auto">
+                    <MudSimpleTable Hover="true" Dense="true">
+                        <thead>
+                            <tr>
+                                <th style="white-space: nowrap;">Timestamp</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Resource</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in AuditLogs)
+                            {
+                                <tr>
+                                    <td style="white-space: nowrap; font-size: 0.8125rem; color: var(--mud-palette-text-secondary);">@log.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td style="font-size: 0.8125rem; font-weight: 600;">@(log.Username ?? "—")</td>
+                                    <td>
+                                        <MudChip T="string" Color="@ActionColor(log.Action)" Size="Size.Small">@log.Action</MudChip>
+                                    </td>
+                                    <td style="font-size: 0.8125rem;">@(log.Resource ?? "—")</td>
+                                    <td style="font-size: 0.8125rem; color: var(--mud-palette-text-secondary);">@(log.Details ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                </MudPaper>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">Showing @AuditLogs.Count most recent entries</MudText>
+            }
         </div>
-    </div>
-}
-else if (ActiveTab == "users")
-{
-    <UserManagementPanel />
-}
-else if (ActiveTab == "status")
-{
-    <SystemStatusPanel />
-}
-else if (ActiveTab == "audit")
-{
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <div class="d-flex align-items-center gap-2">
-            <select class="form-select form-select-sm" style="width: auto;" @bind="AuditFilter" @bind:after="FilterLogs">
-                <option value="">All actions</option>
-                <option value="Login">Login</option>
-                <option value="Script">Scripts</option>
-                <option value="Job">Jobs</option>
-                <option value="User">Users</option>
-                <option value="Settings">Settings</option>
-            </select>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAuditLogs">
-            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-        </button>
-    </div>
-
-    @if (AuditLogs is null)
-    {
-        <div class="d-flex align-items-center gap-2 text-muted">
-            <span class="spinner-border spinner-border-sm"></span> Loading logs...
-        </div>
-    }
-    else if (!AuditLogs.Any())
-    {
-        <div class="text-muted">No audit log entries found.</div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-hover table-sm align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th class="text-nowrap">Timestamp</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Resource</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var log in AuditLogs)
-                    {
-                        <tr>
-                            <td class="text-nowrap text-muted small">@log.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
-                            <td class="small fw-semibold">@(log.Username ?? "—")</td>
-                            <td>
-                                <span class="badge @ActionBadgeClass(log.Action)">@log.Action</span>
-                            </td>
-                            <td class="small">@(log.Resource ?? "—")</td>
-                            <td class="small text-muted">@(log.Details ?? "—")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        <div class="text-muted small">Showing @AuditLogs.Count most recent entries</div>
-    }
-}
+    </MudTabPanel>
+</MudTabs>
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     private string _username = string.Empty;
-    private string ActiveTab { get; set; } = "application";
+    private int _activePanelIndex;
 
     private AppSetting? AppSettings { get; set; }
     private bool IsSavingAppSettings { get; set; }
@@ -184,14 +152,37 @@ else if (ActiveTab == "audit")
 
         var uri = new Uri(Nav.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        ActiveTab = query["tab"] ?? "application";
+        var tabName = query["tab"] ?? "application";
+        _activePanelIndex = tabName switch
+        {
+            "users" => 1,
+            "status" => 2,
+            "audit" => 3,
+            _ => 0
+        };
 
         using var db = DbFactory.CreateDbContext();
         AppSettings = db.Settings.Find(1) ?? new AppSetting { Id = 1 };
 
-        if (ActiveTab == "audit")
+        if (_activePanelIndex == 3)
             LoadAuditLogs();
     }
+
+    private void OnTabChanged()
+    {
+        if (_activePanelIndex == 3)
+            LoadAuditLogs();
+    }
+
+    private static readonly (string Value, string Label)[] AuditFilterOptions =
+    [
+        ("", "All actions"),
+        ("Login", "Login"),
+        ("Script", "Scripts"),
+        ("Job", "Jobs"),
+        ("User", "Users"),
+        ("Settings", "Settings"),
+    ];
 
     private void LoadAuditLogs()
     {
@@ -233,15 +224,15 @@ else if (ActiveTab == "audit")
         finally { IsSavingAppSettings = false; }
     }
 
-    private static string ActionBadgeClass(string action) => action switch
+    private static Color ActionColor(string action) => action switch
     {
-        _ when action.StartsWith("Login.Failed") => "bg-danger",
-        _ when action.StartsWith("Login") => "bg-success",
-        _ when action.StartsWith("Script.Executed") => "bg-primary",
-        _ when action.StartsWith("Script") => "bg-info text-dark",
-        _ when action.StartsWith("Job") => "bg-warning text-dark",
-        _ when action.StartsWith("User") => "bg-secondary",
-        _ when action.StartsWith("Settings") => "bg-dark",
-        _ => "bg-secondary"
+        _ when action.StartsWith("Login.Failed") => Color.Error,
+        _ when action.StartsWith("Login") => Color.Success,
+        _ when action.StartsWith("Script.Executed") => Color.Primary,
+        _ when action.StartsWith("Script") => Color.Info,
+        _ when action.StartsWith("Job") => Color.Warning,
+        _ when action.StartsWith("User") => Color.Default,
+        _ when action.StartsWith("Settings") => Color.Dark,
+        _ => Color.Default
     };
 }

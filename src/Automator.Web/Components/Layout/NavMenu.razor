@@ -1,61 +1,39 @@
-@rendermode InteractiveServer
+@inject NavigationManager Nav
+@implements IDisposable
 
-<nav class="bg-dark text-white d-flex flex-column" style="width: 220px; min-height: 100vh;">
-    <div class="p-3 border-bottom border-secondary">
-        <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-lightning-charge-fill text-warning fs-4"></i>
-            <span class="fw-bold fs-5">Automator</span>
+<div class="app-sidebar">
+    <div class="app-sidebar-logo">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <MudIcon Icon="@Icons.Material.Filled.Bolt" Color="Color.Warning" />
+            <MudText Typo="Typo.h6" Style="color: white; font-weight: 700; margin: 0; line-height: 1.2;">Automator</MudText>
         </div>
     </div>
 
-    <ul class="nav nav-pills flex-column p-2 gap-1 mt-1">
-        <li class="nav-item">
-            <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
-                <i class="bi bi-house-fill me-2"></i>Dashboard
-            </NavLink>
-        </li>
-        <li class="nav-item">
-            <NavLink class="nav-link text-white" href="scripts">
-                <i class="bi bi-collection-fill me-2"></i>Script Library
-            </NavLink>
-        </li>
-        <li class="nav-item">
-            <NavLink class="nav-link text-white" href="runner">
-                <i class="bi bi-play-circle-fill me-2"></i>Run Script
-            </NavLink>
-        </li>
-        <li class="nav-item">
-            <NavLink class="nav-link text-white" href="history">
-                <i class="bi bi-clock-history me-2"></i>History
-            </NavLink>
-        </li>
-        <li class="nav-item">
-            <NavLink class="nav-link text-white" href="jobs">
-                <i class="bi bi-calendar-check me-2"></i>Scheduled Jobs
-            </NavLink>
-        </li>
+    <MudNavMenu>
+        <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+        <MudNavLink Href="scripts" Icon="@Icons.Material.Filled.LibraryBooks">Script Library</MudNavLink>
+        <MudNavLink Href="runner" Icon="@Icons.Material.Filled.PlayCircle">Run Script</MudNavLink>
+        <MudNavLink Href="history" Icon="@Icons.Material.Filled.History">History</MudNavLink>
+        <MudNavLink Href="jobs" Icon="@Icons.Material.Filled.CalendarToday">Scheduled Jobs</MudNavLink>
         <AuthorizeView Roles="Admin">
-            <li class="nav-item">
-                <NavLink class="nav-link text-white" href="settings">
-                    <i class="bi bi-gear-fill me-2"></i>Settings
-                </NavLink>
-            </li>
+            <MudNavLink Href="settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
         </AuthorizeView>
-    </ul>
+    </MudNavMenu>
 
-    <div class="mt-auto p-3 border-top border-secondary">
-        <small class="text-secondary">
-            <i class="bi bi-info-circle me-1"></i>
-            Bash &bull; PowerShell &bull; Python &bull; Ansible
-        </small>
+    <div class="app-sidebar-footer">
+        <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.45);">
+            Bash · PowerShell · Python · Ansible
+        </MudText>
     </div>
-</nav>
+</div>
 
-<style>
-    .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-    }
-    .nav-link.active {
-        background-color: rgba(255, 255, 255, 0.2) !important;
-    }
-</style>
+@code {
+    protected override void OnInitialized() =>
+        Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        InvokeAsync(StateHasChanged);
+
+    public void Dispose() =>
+        Nav.LocationChanged -= OnLocationChanged;
+}

@@ -1,6 +1,5 @@
 @page "/jobs"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inject IJobSchedulerService Scheduler
 @inject IScriptRunnerService ScriptService
 @inject IAuditLogService AuditService
@@ -8,18 +7,17 @@
 
 <PageTitle>Scheduled Jobs - Automator</PageTitle>
 
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <h4 class="mb-0">Scheduled Jobs</h4>
-    <AuthorizeView Roles="Admin,Operator">
-        <button class="btn btn-primary" @onclick="NewJob">
-            <i class="bi bi-plus-lg me-1"></i>New Job
-        </button>
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+    <MudText Typo="Typo.h5" Style="margin: 0;">Scheduled Jobs</MudText>
+    <AuthorizeView Roles="Admin,Developer,Operator">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="NewJob">New Job</MudButton>
     </AuthorizeView>
 </div>
 
 <PageHelp>
     Jobs fire automatically when their cron schedule is due. The scheduler checks every 15 seconds.
-    <ul class="mb-0 mt-1 ps-3">
+    <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem;">
         <li>Disable a job to pause it without deleting it</li>
         <li>Use <strong>Run Now</strong> to trigger a job immediately outside its schedule</li>
         <li>Jobs share the same execution environment as manually-run scripts</li>
@@ -28,107 +26,94 @@
 
 @if (IsEditing)
 {
-    <div class="card mb-4 border-primary">
-        <div class="card-header bg-primary text-white fw-semibold">
-            @(EditingJob.Id == Guid.Empty ? "New Scheduled Job" : $"Edit: {EditingJob.Name}")
-        </div>
-        <div class="card-body">
-            <div class="row g-3 mb-3">
-                <div class="col-md-5">
-                    <label class="form-label fw-semibold">Job Name</label>
-                    <input class="form-control" @bind="EditingJob.Name" placeholder="e.g. Nightly Disk Check" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold">Script</label>
-                    <select class="form-select" @bind="EditingJob.ScriptId">
-                        <option value="@Guid.Empty">— select a script —</option>
+    <MudCard Class="mb-4" Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">@(EditingJob.Id == Guid.Empty ? "New Scheduled Job" : $"Edit: {EditingJob.Name}")</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="5">
+                    <MudTextField @bind-Value="EditingJob.Name" Label="Job Name" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Placeholder="e.g. Nightly Disk Check" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="Guid" @bind-Value="EditingJob.ScriptId" Label="Script"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        <MudSelectItem T="Guid" Value="@Guid.Empty">— select a script —</MudSelectItem>
                         @foreach (var script in ScriptService.Scripts.OrderBy(s => s.Name))
                         {
-                            <option value="@script.Id">@script.Name (@script.Language.ToDisplayName())</option>
+                            <MudSelectItem T="Guid" Value="@script.Id">@script.Name (@script.Language.ToDisplayName())</MudSelectItem>
                         }
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">
-                        Enabled
-                    </label>
-                    <div class="form-check form-switch mt-2">
-                        <input class="form-check-input" type="checkbox" role="switch"
-                               @bind="EditingJob.IsEnabled" id="enabledSwitch" />
-                        <label class="form-check-label" for="enabledSwitch">
-                            @(EditingJob.IsEnabled ? "Active" : "Paused")
-                        </label>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="3" Style="display: flex; align-items: center;">
+                    <MudSwitch T="bool" @bind-Value="EditingJob.IsEnabled" Color="Color.Primary"
+                               Label="@(EditingJob.IsEnabled ? "Active" : "Paused")" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600; margin-bottom: 0.25rem;">
+                        Cron Expression
+                        <HelpIcon Text="5 fields: minute (0-59) · hour (0-23) · day-of-month (1-31) · month (1-12) · weekday (0-6, Sun=0). Use * for any, */n for every nth, or comma-separate values. Example: '0 2 * * 1' = every Monday at 2 am." />
+                    </MudText>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; max-width: 380px;">
+                        <MudTextField @bind-Value="EditingJob.CronExpression" Label="min hr day mo dow"
+                                      Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true"
+                                      Class="font-monospace" Placeholder="0 * * * *" Style="flex: 1;" />
                     </div>
-                </div>
-            </div>
-
-            <div class="mb-1">
-                <label class="form-label fw-semibold">Cron Expression <HelpIcon Text="5 fields: minute (0-59) · hour (0-23) · day-of-month (1-31) · month (1-12) · weekday (0-6, Sun=0). Use * for any, */n for every nth, or comma-separate values. Example: '0 2 * * 1' = every Monday at 2 am." /></label>
-                <div class="input-group" style="max-width: 340px;">
-                    <span class="input-group-text font-monospace text-muted small">min hr day mo dow</span>
-                    <input class="form-control font-monospace"
-                           @bind="EditingJob.CronExpression"
-                           @bind:event="oninput"
-                           placeholder="0 * * * *" />
-                </div>
-            </div>
-
-            <div class="mb-2 d-flex flex-wrap gap-1">
-                @foreach (var preset in CronPresets)
-                {
-                    <button class="btn btn-sm btn-outline-secondary"
-                            @onclick="() => ApplyPreset(preset.Cron)">
-                        @preset.Label
-                    </button>
-                }
-            </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.5rem;">
+                        @foreach (var preset in CronPresets)
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Default"
+                                       OnClick="() => ApplyPreset(preset.Cron)">@preset.Label</MudButton>
+                        }
+                    </div>
+                </MudItem>
+            </MudGrid>
 
             @if (!string.IsNullOrWhiteSpace(EditingJob.CronExpression))
             {
                 var next = Scheduler.GetNextOccurrence(EditingJob.CronExpression);
                 @if (next.HasValue)
                 {
-                    <div class="alert alert-info py-2 small mb-3">
-                        <i class="bi bi-info-circle me-1"></i>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
                         Next run: <strong>@next.Value.ToLocalTime().ToString("f")</strong>
                         (@FormatTimeUntil(next.Value))
-                    </div>
+                    </MudAlert>
                 }
                 else
                 {
-                    <div class="alert alert-warning py-2 small mb-3">
-                        <i class="bi bi-exclamation-triangle me-1"></i>Invalid cron expression.
-                        Use 5 fields: minute hour day month day-of-week.
-                    </div>
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        Invalid cron expression. Use 5 fields: minute hour day month day-of-week.
+                    </MudAlert>
                 }
             }
 
             @if (!string.IsNullOrEmpty(ValidationError))
             {
-                <div class="alert alert-danger py-2">@ValidationError</div>
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@ValidationError</MudAlert>
             }
-
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" @onclick="SaveJob">
-                    <i class="bi bi-floppy me-1"></i>Save
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
-            </div>
-        </div>
-    </div>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveJob">Save</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
 }
 
 @if (!Scheduler.Jobs.Any())
 {
-    <div class="text-muted">No scheduled jobs yet. Click "New Job" to create one.</div>
+    <MudText Color="Color.Secondary">No scheduled jobs yet. Click "New Job" to create one.</MudText>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-dark">
+    <MudPaper Elevation="1" Class="overflow-auto">
+        <MudSimpleTable Hover="true" Dense="true">
+            <thead>
                 <tr>
-                    <th>Enabled</th>
+                    <th style="width: 80px;">Enabled</th>
                     <th>Name</th>
                     <th>Script</th>
                     <th>Schedule</th>
@@ -142,108 +127,96 @@ else
                 @foreach (var job in Scheduler.Jobs.OrderBy(j => j.Name))
                 {
                     var script = ScriptService.GetScript(job.ScriptId);
-                    <tr class="@(job.IsEnabled ? "" : "table-secondary opacity-75")">
+                    <tr style="@(job.IsEnabled ? "" : "opacity: 0.65;")">
                         <td>
-                            <AuthorizeView Roles="Admin,Operator">
+                            <AuthorizeView Roles="Admin,Developer,Operator">
                                 <Authorized>
-                                    <div class="form-check form-switch mb-0">
-                                        <input class="form-check-input" type="checkbox" role="switch"
-                                               checked="@job.IsEnabled"
-                                               @onchange="() => ToggleEnabled(job)" />
-                                    </div>
+                                    <MudSwitch T="bool" Value="@job.IsEnabled"
+                                               ValueChanged="() => ToggleEnabled(job)"
+                                               Color="Color.Primary" Size="Size.Small" />
                                 </Authorized>
                                 <NotAuthorized>
-                                    <span class="badge @(job.IsEnabled ? "bg-success" : "bg-secondary")">
+                                    <MudChip T="string" Color="@(job.IsEnabled ? Color.Success : Color.Default)" Size="Size.Small">
                                         @(job.IsEnabled ? "On" : "Off")
-                                    </span>
+                                    </MudChip>
                                 </NotAuthorized>
                             </AuthorizeView>
                         </td>
-                        <td class="fw-semibold">@job.Name</td>
+                        <td style="font-weight: 600;">@job.Name</td>
                         <td>
                             @if (script is not null)
                             {
-                                <span class="badge @script.Language.ToBadgeClass()">@script.Language.ToDisplayName()</span>
-                                <span class="ms-1 small">@script.Name</span>
+                                <MudChip T="string" Color="@script.Language.ToColor()" Size="Size.Small">@script.Language.ToDisplayName()</MudChip>
+                                <span style="margin-left: 0.25rem; font-size: 0.875rem;">@script.Name</span>
                             }
                             else
                             {
-                                <span class="text-danger small"><i class="bi bi-exclamation-triangle"></i> Script not found</span>
+                                <MudText Color="Color.Error" Typo="Typo.caption">Script not found</MudText>
                             }
                         </td>
-                        <td><code class="small">@job.CronExpression</code></td>
-                        <td class="text-nowrap small">
+                        <td><code style="font-size: 0.8rem;">@job.CronExpression</code></td>
+                        <td style="white-space: nowrap; font-size: 0.875rem;">
                             @if (job.IsEnabled && job.NextRunAt.HasValue)
                             {
-                                <span title="@job.NextRunAt.Value.ToLocalTime().ToString("f")">
-                                    @FormatTimeUntil(job.NextRunAt.Value)
-                                </span>
+                                <span title="@job.NextRunAt.Value.ToLocalTime().ToString("f")">@FormatTimeUntil(job.NextRunAt.Value)</span>
                             }
                             else
                             {
-                                <span class="text-muted">—</span>
+                                <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText>
                             }
                         </td>
-                        <td class="text-nowrap small text-muted">
+                        <td style="white-space: nowrap; font-size: 0.875rem; color: var(--mud-palette-text-secondary);">
                             @(job.LastRunAt.HasValue ? job.LastRunAt.Value.ToLocalTime().ToString("g") : "Never")
                         </td>
                         <td>
                             @if (job.LastExitCode.HasValue)
                             {
-                                <span class="badge @(job.LastRunSucceeded ? "bg-success" : "bg-danger")">
+                                <MudChip T="string" Color="@(job.LastRunSucceeded ? Color.Success : Color.Error)" Size="Size.Small">
                                     exit @job.LastExitCode
-                                </span>
+                                </MudChip>
                             }
                             else
                             {
-                                <span class="text-muted small">—</span>
+                                <MudText Color="Color.Secondary" Typo="Typo.caption">—</MudText>
                             }
                         </td>
                         <td>
-                            <AuthorizeView Roles="Admin,Operator">
-                                <div class="d-flex gap-1">
+                            <AuthorizeView Roles="Admin,Developer,Operator">
+                                <div style="display: flex; gap: 0.125rem;">
                                     @if (script is not null)
                                     {
-                                        <button class="btn btn-sm btn-success" title="Run now"
-                                                @onclick="() => RunNow(job)">
-                                            <i class="bi bi-play-fill"></i>
-                                        </button>
+                                        <MudIconButton Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Success"
+                                                       Size="Size.Small" OnClick="() => RunNow(job)" />
                                     }
-                                    <button class="btn btn-sm btn-outline-primary" title="Edit"
-                                            @onclick="() => EditJob(job)">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" title="Delete"
-                                            @onclick="() => ConfirmDelete(job)">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
+                                                   Size="Size.Small" OnClick="() => EditJob(job)" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                   Size="Size.Small" OnClick="() => ConfirmDelete(job)" />
                                 </div>
                             </AuthorizeView>
                         </td>
                     </tr>
                 }
             </tbody>
-        </table>
-    </div>
+        </MudSimpleTable>
+    </MudPaper>
 }
 
 @if (DeletingJob is not null)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                </div>
-                <div class="modal-body">
-                    Delete job <strong>@DeletingJob.Name</strong>? This cannot be undone.
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="DeleteConfirmed">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => DeletingJob = null">Cancel</button>
-                </div>
-            </div>
-        </div>
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudCard Style="width: 380px;">
+            <MudCardHeader>
+                <CardHeaderContent><MudText Typo="Typo.h6">Confirm Delete</MudText></CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                Delete job <strong>@DeletingJob.Name</strong>? This cannot be undone.
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteConfirmed">Delete</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="() => DeletingJob = null">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
     </div>
 }
 
@@ -334,10 +307,7 @@ else
 
     private void CancelEdit() => IsEditing = false;
 
-    private void ApplyPreset(string cron)
-    {
-        EditingJob.CronExpression = cron;
-    }
+    private void ApplyPreset(string cron) => EditingJob.CronExpression = cron;
 
     private void ToggleEnabled(ScheduledJob job)
     {
@@ -357,10 +327,9 @@ else
     {
         if (DeletingJob is not null)
         {
-            var name = DeletingJob.Name;
             Scheduler.DeleteJob(DeletingJob.Id);
+            _ = AuditService.LogAsync("Job.Deleted", DeletingJob.Name, null, _username);
             DeletingJob = null;
-            _ = AuditService.LogAsync("Job.Deleted", name, null, _username);
         }
     }
 

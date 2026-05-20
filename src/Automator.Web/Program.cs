@@ -4,11 +4,16 @@ using Automator.Web.Models;
 using Automator.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseStaticWebAssets();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions>(o =>
+    o.DetailedErrors = true);
 
 builder.Services.AddRazorPages();
 
@@ -43,6 +48,7 @@ builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
 builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
 builder.Services.AddHostedService<SchedulerBackgroundService>();
+builder.Services.AddMudServices();
 
 var app = builder.Build();
 
@@ -97,7 +103,7 @@ using (var scope = app.Services.CreateScope())
 
     // Seed roles
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    foreach (var role in new[] { "Admin", "Operator", "Viewer" })
+    foreach (var role in new[] { "Admin", "Developer", "Operator", "Viewer" })
     {
         if (!await roleManager.RoleExistsAsync(role))
             await roleManager.CreateAsync(new IdentityRole(role));

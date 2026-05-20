@@ -1,182 +1,189 @@
 @page "/"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 @inject IJobSchedulerService Scheduler
 @inject IJSRuntime JS
 
 <PageTitle>Dashboard - Automator</PageTitle>
 
-<h4 class="mb-3">Dashboard</h4>
+<MudText Typo="Typo.h5" Class="mb-3">Dashboard</MudText>
 
 @if (!ScriptService.Scripts.Any())
 {
-    <div class="alert alert-info d-flex gap-3 mb-3 align-items-start">
-        <i class="bi bi-lightbulb-fill fs-4 flex-shrink-0 mt-1 text-warning"></i>
-        <div>
-            <strong>Welcome to Automator!</strong> Here's how to get started:
-            <ol class="mb-0 mt-1 ps-3 small">
-                <li>Open <a href="/scripts" class="alert-link">Script Library</a> to browse or create scripts</li>
-                <li>Head to <a href="/runner" class="alert-link">Run Script</a> to execute one on demand</li>
-                <li>Set up <a href="/jobs" class="alert-link">Scheduled Jobs</a> to automate recurring tasks</li>
-                <li>Check <a href="/status" class="alert-link">System Status</a> to verify required runtimes are installed</li>
-            </ol>
-        </div>
-    </div>
+    <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.Lightbulb" Class="mb-3">
+        <MudText><strong>Welcome to Automator!</strong> Here's how to get started:</MudText>
+        <ol style="margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.875rem;">
+            <li>Open <MudLink Href="/scripts">Script Library</MudLink> to browse or create scripts</li>
+            <li>Head to <MudLink Href="/runner">Run Script</MudLink> to execute one on demand</li>
+            <li>Set up <MudLink Href="/jobs">Scheduled Jobs</MudLink> to automate recurring tasks</li>
+            <li>Check <MudLink Href="/settings?tab=status">System Status</MudLink> to verify required runtimes are installed</li>
+        </ol>
+    </MudAlert>
 }
 
-<div class="card mb-4">
-    <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-graph-up me-2"></i>Executions Over Time</span>
-        <span class="text-muted small">Last 14 days</span>
-    </div>
-    <div class="card-body" style="height: 260px; position: relative;">
+<MudCard Class="mb-4" Elevation="1">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <MudIcon Icon="@Icons.Material.Filled.BarChart" />
+                    <MudText Typo="Typo.h6">Executions Over Time</MudText>
+                </div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Last 14 days</MudText>
+            </div>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent Style="height: 260px; position: relative; padding-top: 0;">
         <canvas id="executionChart"></canvas>
-    </div>
+    </MudCardContent>
+</MudCard>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <a href="/scripts" style="text-decoration: none;">
+        <MudCard Elevation="1" Style="border-top: 4px solid var(--mud-palette-primary);">
+            <MudCardContent Style="display: flex; align-items: center; gap: 1rem;">
+                <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Color="Color.Primary" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Color="Color.Primary">@ScriptService.Scripts.Count</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Scripts</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </a>
+    <a href="/history" style="text-decoration: none;">
+        <MudCard Elevation="1" Style="border-top: 4px solid var(--mud-palette-success);">
+            <MudCardContent Style="display: flex; align-items: center; gap: 1rem;">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Color="Color.Success">@SuccessCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Successful Runs</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </a>
+    <a href="/history" style="text-decoration: none;">
+        <MudCard Elevation="1" Style="border-top: 4px solid var(--mud-palette-error);">
+            <MudCardContent Style="display: flex; align-items: center; gap: 1rem;">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Color="Color.Error">@FailureCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Failed Runs</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </a>
+    <a href="/runner" style="text-decoration: none;">
+        <MudCard Elevation="1" Style="border-top: 4px solid var(--mud-palette-warning);">
+            <MudCardContent Style="display: flex; align-items: center; gap: 1rem;">
+                <MudIcon Icon="@Icons.Material.Filled.Autorenew" Color="Color.Warning" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@RunningCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Running Now</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </a>
+    <a href="/jobs" style="text-decoration: none;">
+        <MudCard Elevation="1" Style="border-top: 4px solid var(--mud-palette-info);">
+            <MudCardContent Style="display: flex; align-items: center; gap: 1rem;">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Info" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Color="Color.Info">@Scheduler.Jobs.Count(j => j.IsEnabled)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Active Schedules</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </a>
 </div>
 
-<div class="row g-3 row-cols-5 mb-4">
-    <div class="col">
-        <a href="/scripts" class="text-decoration-none">
-            <div class="card text-bg-primary h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <i class="bi bi-collection-fill fs-2"></i>
-                    <div>
-                        <div class="fs-2 fw-bold">@ScriptService.Scripts.Count</div>
-                        <div class="small opacity-75">Scripts</div>
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="1" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.LibraryBooks" Size="Size.Small" />
+                        <MudText Typo="Typo.h6">Scripts by Language</MudText>
                     </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="/history" class="text-decoration-none">
-            <div class="card text-bg-success h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <i class="bi bi-check-circle-fill fs-2"></i>
-                    <div>
-                        <div class="fs-2 fw-bold">@SuccessCount</div>
-                        <div class="small opacity-75">Successful Runs</div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="/history" class="text-decoration-none">
-            <div class="card text-bg-danger h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <i class="bi bi-x-circle-fill fs-2"></i>
-                    <div>
-                        <div class="fs-2 fw-bold">@FailureCount</div>
-                        <div class="small opacity-75">Failed Runs</div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="/runner" class="text-decoration-none">
-            <div class="card text-bg-warning h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <i class="bi bi-arrow-repeat fs-2"></i>
-                    <div>
-                        <div class="fs-2 fw-bold">@RunningCount</div>
-                        <div class="small opacity-75">Running Now</div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-    <div class="col">
-        <a href="/jobs" class="text-decoration-none">
-            <div class="card text-bg-info h-100">
-                <div class="card-body d-flex align-items-center gap-3">
-                    <i class="bi bi-calendar-check fs-2"></i>
-                    <div>
-                        <div class="fs-2 fw-bold">@Scheduler.Jobs.Count(j => j.IsEnabled)</div>
-                        <div class="small opacity-75">Active Schedules</div>
-                    </div>
-                </div>
-            </div>
-        </a>
-    </div>
-</div>
-
-<div class="row g-3">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header fw-semibold">
-                <i class="bi bi-collection me-2"></i>Scripts by Language
-            </div>
-            <div class="card-body">
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
                 @foreach (var lang in Enum.GetValues<ScriptLanguage>())
                 {
                     var count = ScriptService.Scripts.Count(s => s.Language == lang);
-                    <div class="d-flex align-items-center mb-2 gap-2">
-                        <span class="badge @lang.ToBadgeClass() text-nowrap" style="width: 110px;">@lang.ToDisplayName()</span>
-                        <div class="progress flex-grow-1" style="height: 18px;">
-                            <div class="progress-bar @lang.ToBadgeClass()"
-                                 style="width: @(ScriptService.Scripts.Count > 0 ? (count * 100 / ScriptService.Scripts.Count) : 0)%">
-                            </div>
-                        </div>
-                        <span class="text-muted small" style="width: 20px;">@count</span>
+                    var pct = ScriptService.Scripts.Count > 0 ? (double)count * 100 / ScriptService.Scripts.Count : 0;
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <MudChip T="string" Color="@lang.ToColor()" Size="Size.Small"
+                                 Style="width: 120px; justify-content: center;">@lang.ToDisplayName()</MudChip>
+                        <MudProgressLinear Color="@lang.ToColor()" Rounded="true" Size="Size.Medium"
+                                           Value="@pct" Style="flex: 1;" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="width: 20px; text-align: right;">@count</MudText>
                     </div>
                 }
-            </div>
-        </div>
-    </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
 
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header fw-semibold">
-                <i class="bi bi-clock-history me-2"></i>Recent Executions
-            </div>
-            <div class="card-body p-0">
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="1" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                        <MudText Typo="Typo.h6">Recent Executions</MudText>
+                    </div>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Style="padding: 0;">
                 @if (!ScriptService.ExecutionHistory.Any())
                 {
-                    <div class="p-3 text-muted">No executions yet. <a href="/runner">Run a script</a> to get started.</div>
+                    <div style="padding: 1rem;">
+                        <MudText Color="Color.Secondary">No executions yet. <MudLink Href="/runner">Run a script</MudLink> to get started.</MudText>
+                    </div>
                 }
                 else
                 {
-                    <ul class="list-group list-group-flush">
+                    <MudList T="string" Dense="true" Padding="false">
                         @foreach (var run in ScriptService.ExecutionHistory.Take(5))
                         {
-                            <li class="list-group-item d-flex align-items-center gap-2">
-                                @if (run.IsRunning)
-                                {
-                                    <span class="spinner-border spinner-border-sm text-warning"></span>
-                                }
-                                else if (run.IsSuccess)
-                                {
-                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-x-circle-fill text-danger"></i>
-                                }
-                                <div class="flex-grow-1">
-                                    <div class="fw-semibold small">@run.ScriptName</div>
-                                    <div class="text-muted" style="font-size: 0.75rem;">
-                                        @run.StartedAt.ToLocalTime().ToString("g")
-                                        @if (run.Duration.HasValue)
-                                        {
-                                            <span> &bull; @run.Duration.Value.TotalSeconds.ToString("F1")s</span>
-                                        }
+                            <MudListItem T="string">
+                                <div style="display: flex; align-items: center; gap: 0.75rem; width: 100%;">
+                                    @if (run.IsRunning)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Warning" />
+                                    }
+                                    else if (run.IsSuccess)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" />
+                                    }
+                                    <div style="flex: 1; min-width: 0;">
+                                        <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@run.ScriptName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @run.StartedAt.ToLocalTime().ToString("g")
+                                            @if (run.Duration.HasValue)
+                                            {
+                                                <span> · @run.Duration.Value.TotalSeconds.ToString("F1")s</span>
+                                            }
+                                        </MudText>
                                     </div>
+                                    <MudChip T="string" Color="@run.Language.ToColor()" Size="Size.Small">@run.Language.ToDisplayName()</MudChip>
                                 </div>
-                                <span class="badge @run.Language.ToBadgeClass()">@run.Language.ToDisplayName()</span>
-                            </li>
+                            </MudListItem>
+                            <MudDivider />
                         }
-                    </ul>
+                    </MudList>
                 }
-            </div>
-            <div class="card-footer">
-                <a href="/history" class="btn btn-sm btn-outline-secondary">View all history</a>
-            </div>
-        </div>
-    </div>
-</div>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/history" Variant="Variant.Outlined" Size="Size.Small" Color="Color.Default">View all history</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
 
 @code {
     private int SuccessCount => ScriptService.ExecutionHistory.Count(r => !r.IsRunning && r.IsSuccess);
@@ -191,7 +198,7 @@
             .Where(r => !r.IsRunning)
             .ToList();
 
-        var today = DateTime.UtcNow.Date;
+        var today = DateTime.Now.Date;
         var labels = new List<string>();
         var total   = new List<int>();
         var success = new List<int>();
@@ -200,7 +207,7 @@
         for (int i = 13; i >= 0; i--)
         {
             var date = today.AddDays(-i);
-            var day = history.Where(r => r.StartedAt.Date == date).ToList();
+            var day = history.Where(r => r.StartedAt.ToLocalTime().Date == date).ToList();
             labels.Add(date.ToString("MMM d"));
             total.Add(day.Count);
             success.Add(day.Count(r => r.IsSuccess));

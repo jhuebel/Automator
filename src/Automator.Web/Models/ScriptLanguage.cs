@@ -1,3 +1,5 @@
+using MudBlazor;
+
 namespace Automator.Web.Models;
 
 public enum ScriptLanguage
@@ -30,19 +32,19 @@ public static class ScriptLanguageExtensions
 
     public static string ToIconClass(this ScriptLanguage lang) => lang switch
     {
-        ScriptLanguage.Bash => "bi-terminal",
-        ScriptLanguage.PowerShell => "bi-window",
-        ScriptLanguage.Python => "bi-filetype-py",
-        ScriptLanguage.Ansible => "bi-gear-fill",
-        _ => "bi-file-code"
+        ScriptLanguage.Bash => Icons.Material.Filled.Terminal,
+        ScriptLanguage.PowerShell => Icons.Material.Filled.Window,
+        ScriptLanguage.Python => Icons.Material.Filled.Code,
+        ScriptLanguage.Ansible => Icons.Material.Filled.Settings,
+        _ => Icons.Material.Filled.Code
     };
 
-    public static string ToBadgeClass(this ScriptLanguage lang) => lang switch
+    public static Color ToColor(this ScriptLanguage lang) => lang switch
     {
-        ScriptLanguage.Bash => "bg-success",
-        ScriptLanguage.PowerShell => "bg-primary",
-        ScriptLanguage.Python => "bg-warning text-dark",
-        ScriptLanguage.Ansible => "bg-danger",
-        _ => "bg-secondary"
+        ScriptLanguage.Bash => Color.Success,
+        ScriptLanguage.PowerShell => Color.Primary,
+        ScriptLanguage.Python => Color.Warning,
+        ScriptLanguage.Ansible => Color.Error,
+        _ => Color.Default
     };
 }

@@ -1,136 +1,144 @@
 @page "/runner"
 @page "/runner/{ScriptId:guid}"
-@attribute [Authorize(Roles = "Admin,Operator")]
-@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,Developer,Operator")]
 @inject IScriptRunnerService ScriptService
 @implements IDisposable
 
 <PageTitle>Run Script - Automator</PageTitle>
 
-<h4 class="mb-3">Run Script</h4>
+<MudText Typo="Typo.h5" Class="mb-3">Run Script</MudText>
 
 <PageHelp>
     Scripts run as the OS user hosting this application and inherit its environment variables.
     Output streams line-by-line in real time. Use <strong>Cancel</strong> to terminate early.
-    All runs — successful or not — are saved to <a href="/history">History</a>.
+    All runs — successful or not — are saved to <MudLink Href="/history">History</MudLink>.
     Exit code <code>0</code> = success; any other value = failure.
 </PageHelp>
 
-<div class="row g-3">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header fw-semibold">Select Script</div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="1">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Select Script</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Style="padding: 0; max-height: 400px; overflow-y: auto;">
+                <MudList T="ScriptDefinition" Dense="true" Padding="false"
+                         SelectedValue="SelectedScript" SelectedValueChanged="SelectScript">
                     @foreach (var script in ScriptService.Scripts.OrderBy(s => s.Name))
                     {
-                        <li class="list-group-item list-group-item-action @(SelectedScript?.Id == script.Id ? "active" : "")"
-                            style="cursor: pointer;"
-                            @onclick="() => SelectScript(script)">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="badge @script.Language.ToBadgeClass() text-nowrap">@script.Language.ToDisplayName()</span>
-                                <span class="small">@script.Name</span>
+                        <MudListItem T="ScriptDefinition" Value="@script"
+                                     Style="@(SelectedScript?.Id == script.Id ? "background: var(--mud-palette-primary-lighten); font-weight: 600;" : "")">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <MudChip T="string" Color="@script.Language.ToColor()" Size="Size.Small" Style="min-width: 80px; justify-content: center;">@script.Language.ToDisplayName()</MudChip>
+                                <MudText Typo="Typo.body2">@script.Name</MudText>
                             </div>
-                        </li>
+                        </MudListItem>
+                        <MudDivider />
                     }
                     @if (!ScriptService.Scripts.Any())
                     {
-                        <li class="list-group-item text-muted">
-                            No scripts. <a href="/scripts">Add one</a>.
-                        </li>
+                        <MudListItem T="ScriptDefinition">
+                            <MudText Color="Color.Secondary">No scripts. <MudLink Href="/scripts">Add one</MudLink>.</MudText>
+                        </MudListItem>
                     }
-                </ul>
-            </div>
-        </div>
+                </MudList>
+            </MudCardContent>
+        </MudCard>
 
         @if (SelectedScript is not null)
         {
-            <div class="card mt-3">
-                <div class="card-header fw-semibold">Script Details</div>
-                <div class="card-body">
-                    <div class="mb-2">
-                        <span class="badge @SelectedScript.Language.ToBadgeClass() mb-1">@SelectedScript.Language.ToDisplayName()</span>
-                        <div class="fw-semibold">@SelectedScript.Name</div>
+            <MudCard Elevation="1" Class="mt-3">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Script Details</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <div style="margin-bottom: 0.5rem;">
+                        <MudChip T="string" Color="@SelectedScript.Language.ToColor()" Size="Size.Small" Class="mb-1">@SelectedScript.Language.ToDisplayName()</MudChip>
+                        <MudText Typo="Typo.body1" Style="font-weight: 600;">@SelectedScript.Name</MudText>
                         @if (!string.IsNullOrEmpty(SelectedScript.Description))
                         {
-                            <small class="text-muted">@SelectedScript.Description</small>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@SelectedScript.Description</MudText>
                         }
                     </div>
                     @foreach (var tag in SelectedScript.Tags)
                     {
-                        <span class="badge bg-secondary me-1">@tag</span>
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small">@tag</MudChip>
                     }
-                </div>
-                <div class="card-footer d-flex gap-2">
+                </MudCardContent>
+                <MudCardActions>
                     @if (!IsRunning)
                     {
-                        <button class="btn btn-success w-100" @onclick="RunSelected">
-                            <i class="bi bi-play-fill me-1"></i>Run
-                        </button>
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="RunSelected">Run</MudButton>
                     }
                     else
                     {
-                        <button class="btn btn-danger w-100" @onclick="CancelRun">
-                            <i class="bi bi-stop-fill me-1"></i>Cancel
-                        </button>
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Stop" OnClick="CancelRun">Cancel</MudButton>
                     }
-                </div>
-            </div>
+                </MudCardActions>
+            </MudCard>
         }
-    </div>
+    </MudItem>
 
-    <div class="col-md-8">
-        <div class="card h-100">
-            <div class="card-header d-flex align-items-center justify-content-between fw-semibold">
-                <span>
-                    <i class="bi bi-terminal me-2"></i>Output
-                    @if (IsRunning)
-                    {
-                        <span class="spinner-border spinner-border-sm text-warning ms-2"></span>
-                    }
-                    else if (CurrentResult is not null)
-                    {
-                        @if (CurrentResult.IsSuccess)
+    <MudItem xs="12" md="8">
+        <MudCard Elevation="1" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <MudIcon Icon="@Icons.Material.Filled.Terminal" />
+                            <MudText Typo="Typo.h6">Output</MudText>
+                            @if (IsRunning)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Warning" />
+                            }
+                            else if (CurrentResult is not null)
+                            {
+                                @if (CurrentResult.IsSuccess)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" />
+                                }
+                            }
+                        </div>
+                        @if (CurrentResult is not null)
                         {
-                            <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                @if (CurrentResult.Duration.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@CurrentResult.Duration.Value.TotalSeconds.ToString("F2")s</MudText>
+                                }
+                                @if (CurrentResult.ExitCode.HasValue)
+                                {
+                                    <MudChip T="string" Color="@(CurrentResult.IsSuccess ? Color.Success : Color.Error)" Size="Size.Small">
+                                        exit @CurrentResult.ExitCode
+                                    </MudChip>
+                                }
+                                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small"
+                                               Color="Color.Default" OnClick="ClearOutput" />
+                            </div>
                         }
-                        else
-                        {
-                            <i class="bi bi-x-circle-fill text-danger ms-2"></i>
-                        }
-                    }
-                </span>
-                @if (CurrentResult is not null)
-                {
-                    <div class="d-flex gap-2 align-items-center">
-                        @if (CurrentResult.Duration.HasValue)
-                        {
-                            <small class="text-muted">@CurrentResult.Duration.Value.TotalSeconds.ToString("F2")s</small>
-                        }
-                        @if (CurrentResult.ExitCode.HasValue)
-                        {
-                            <span class="badge @(CurrentResult.IsSuccess ? "bg-success" : "bg-danger")">
-                                exit @CurrentResult.ExitCode
-                            </span>
-                        }
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearOutput">
-                            <i class="bi bi-trash"></i>
-                        </button>
                     </div>
-                }
-            </div>
-            <div class="card-body p-0">
-                <pre id="output-container"
-                     class="bg-dark text-light p-3 mb-0 rounded-bottom font-monospace small"
-                     style="min-height: 400px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">@if (OutputLines.Count == 0)
-{<span class="text-secondary">Select a script and click Run to see output here.</span>}
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent Style="padding: 0; flex: 1;">
+                <pre id="output-container" class="output-terminal" style="border-radius: 0 0 4px 4px;">@if (OutputLines.Count == 0)
+{<span style="color: #6b7280;">Select a script and click Run to see output here.</span>}
 @foreach (var line in OutputLines)
-{<span class="@(line.IsError ? "text-danger" : "")">@line.Text
+{<span class="@(line.IsError ? "output-error" : "")">@line.Text
 </span>}</pre>
-            </div>
-        </div>
-    </div>
-</div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
 
 @code {
     [Parameter] public Guid? ScriptId { get; set; }
@@ -155,7 +163,7 @@
             SelectedScript = ScriptService.GetScript(ScriptId.Value);
     }
 
-    private void SelectScript(ScriptDefinition script)
+    private void SelectScript(ScriptDefinition? script)
     {
         SelectedScript = script;
         ClearOutput();
@@ -189,10 +197,7 @@
         }
     }
 
-    private void CancelRun()
-    {
-        _cts?.Cancel();
-    }
+    private void CancelRun() => _cts?.Cancel();
 
     private void ClearOutput()
     {

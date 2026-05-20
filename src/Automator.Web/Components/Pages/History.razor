@@ -1,86 +1,97 @@
 @page "/history"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
 
 <PageTitle>Execution History - Automator</PageTitle>
 
-<h4 class="mb-4">Execution History</h4>
+<MudText Typo="Typo.h5" Class="mb-4">Execution History</MudText>
 
 @if (!ScriptService.ExecutionHistory.Any())
 {
-    <div class="text-muted">No executions yet. <a href="/runner">Run a script</a> to get started.</div>
+    <MudText Color="Color.Secondary">No executions yet. <MudLink Href="/runner">Run a script</MudLink> to get started.</MudText>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-dark">
+    <MudPaper Elevation="1" Class="overflow-auto">
+        <MudSimpleTable Hover="true" Dense="true">
+            <thead>
                 <tr>
-                    <th>Status</th>
+                    <th style="width: 48px;"></th>
                     <th>Script</th>
                     <th>Language</th>
                     <th>Started</th>
                     <th>Duration</th>
                     <th>Exit Code</th>
-                    <th>Output Lines</th>
+                    <th>Output</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var run in ScriptService.ExecutionHistory)
                 {
-                    <tr>
+                    <tr style="cursor: pointer;" @onclick="() => ToggleExpand(run.ExecutionId)">
                         <td>
                             @if (run.IsRunning)
                             {
-                                <span class="spinner-border spinner-border-sm text-warning"></span>
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Warning" />
                             }
                             else if (run.IsSuccess)
                             {
-                                <i class="bi bi-check-circle-fill text-success" title="Success"></i>
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" Title="Success" />
                             }
                             else
                             {
-                                <i class="bi bi-x-circle-fill text-danger" title="Failed (exit @run.ExitCode)"></i>
+                                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small" Title="@($"Failed (exit {run.ExitCode})")" />
                             }
                         </td>
-                        <td class="fw-semibold">@run.ScriptName</td>
-                        <td><span class="badge @run.Language.ToBadgeClass()">@run.Language.ToDisplayName()</span></td>
-                        <td class="text-nowrap">@run.StartedAt.ToLocalTime().ToString("g")</td>
-                        <td class="text-nowrap">
+                        <td style="font-weight: 600;">@run.ScriptName</td>
+                        <td><MudChip T="string" Color="@run.Language.ToColor()" Size="Size.Small">@run.Language.ToDisplayName()</MudChip></td>
+                        <td style="white-space: nowrap;">@run.StartedAt.ToLocalTime().ToString("g")</td>
+                        <td style="white-space: nowrap;">
                             @if (run.Duration.HasValue)
                             {
                                 @($"{run.Duration.Value.TotalSeconds:F2}s")
                             }
                             else
                             {
-                                <span class="text-muted">—</span>
+                                <MudText Color="Color.Secondary" Typo="Typo.body2">—</MudText>
                             }
                         </td>
                         <td>
                             @if (run.ExitCode.HasValue)
                             {
-                                <span class="badge @(run.IsSuccess ? "bg-success" : "bg-danger")">@run.ExitCode</span>
+                                <MudChip T="string" Color="@(run.IsSuccess ? Color.Success : Color.Error)" Size="Size.Small">@run.ExitCode</MudChip>
                             }
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-outline-secondary"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#output-@run.ExecutionId">
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Default"
+                                       EndIcon="@(_expanded.Contains(run.ExecutionId) ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                       OnClick="() => ToggleExpand(run.ExecutionId)">
                                 @run.Output.Count lines
-                            </button>
+                            </MudButton>
                         </td>
                     </tr>
-                    <tr class="collapse" id="output-@run.ExecutionId">
-                        <td colspan="7" class="p-0">
-                            <pre class="bg-dark text-light p-3 m-0 small font-monospace"
-                                 style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">@foreach (var line in run.Output)
-{<span class="@(line.IsError ? "text-danger" : "")">@line.Text
+                    @if (_expanded.Contains(run.ExecutionId))
+                    {
+                        <tr>
+                            <td colspan="7" style="padding: 0;">
+                                <pre class="output-terminal" style="border-radius: 0; min-height: unset; max-height: 300px;">@foreach (var line in run.Output)
+{<span class="@(line.IsError ? "output-error" : "")">@line.Text
 </span>}</pre>
-                        </td>
-                    </tr>
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
-        </table>
-    </div>
+        </MudSimpleTable>
+    </MudPaper>
+}
+
+@code {
+    private readonly HashSet<Guid> _expanded = [];
+
+    private void ToggleExpand(Guid id)
+    {
+        if (!_expanded.Add(id))
+            _expanded.Remove(id);
+    }
 }

@@ -1,45 +1,19 @@
 @inherits LayoutComponentBase
 
-<div class="d-flex vh-100">
+<div style="display: flex; height: 100vh; overflow: hidden;">
     <NavMenu />
-
-    <div class="flex-grow-1 d-flex flex-column overflow-hidden">
-        <header class="bg-dark text-white px-4 py-2 d-flex align-items-center gap-2 shadow-sm">
-            <i class="bi bi-lightning-charge-fill text-warning fs-5"></i>
-            <span class="fw-semibold">Automator</span>
-            <span class="text-secondary small ms-1">IaaS Script Automation</span>
-            <div class="ms-auto d-flex align-items-center">
-                <AuthorizeView>
-                    <Authorized>
-                        <div class="dropdown">
-                            <button class="btn btn-link text-white text-decoration-none border-0 d-flex align-items-center gap-2 py-1 px-2"
-                                    type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <AuthorizeView Roles="Admin" Context="_a">
-                                    <span class="badge bg-danger">Admin</span>
-                                </AuthorizeView>
-                                <AuthorizeView Roles="Operator" Context="_o">
-                                    <span class="badge bg-primary">Operator</span>
-                                </AuthorizeView>
-                                <AuthorizeView Roles="Viewer" Context="_v">
-                                    <span class="badge bg-secondary">Viewer</span>
-                                </AuthorizeView>
-                                <span class="small">@context.User.Identity?.Name</span>
-                                <i class="bi bi-chevron-down" style="font-size: 0.65rem; opacity: 0.7;"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><h6 class="dropdown-header text-truncate" style="max-width: 200px;">@context.User.Identity?.Name</h6></li>
-                                <li><a class="dropdown-item" href="/profile"><i class="bi bi-person-gear me-2"></i>My Account</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item text-danger" href="/account/logout"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
-                            </ul>
-                        </div>
-                    </Authorized>
-                </AuthorizeView>
+    <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+        <div class="app-header">
+            <MudIcon Icon="@Icons.Material.Filled.Bolt" Color="Color.Warning" />
+            <MudText Typo="Typo.h6" Style="color: white; font-weight: 700; margin: 0;">Automator</MudText>
+            <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.55); margin-left: 4px;">IaaS Script Automation</MudText>
+            <div style="margin-left: auto;">
+                <AppHeader />
             </div>
-        </header>
-
-        <main class="flex-grow-1 overflow-auto p-4">
+        </div>
+        <main class="app-content">
             @Body
         </main>
     </div>
 </div>
+<MudProviders />

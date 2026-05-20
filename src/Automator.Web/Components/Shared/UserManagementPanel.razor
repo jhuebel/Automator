@@ -5,7 +5,7 @@
 
 <PageHelp>
     <strong>Role access levels:</strong>
-    <ul class="mb-0 mt-1 ps-3">
+    <ul style="margin: 0.25rem 0 0; padding-left: 1.25rem;">
         <li><strong>Admin</strong> — full access: manage users, create/edit/delete scripts, manage jobs, and run scripts</li>
         <li><strong>Operator</strong> — run scripts and manage scheduled jobs; cannot edit scripts or manage users</li>
         <li><strong>Viewer</strong> — read-only: browse scripts, view history, and check system status</li>
@@ -13,65 +13,124 @@
     You cannot change your own role or delete your own account. The protected admin account cannot be deleted or have its username or role changed.
 </PageHelp>
 
-<div class="d-flex justify-content-end mb-3">
-    <button class="btn btn-primary" @onclick="() => { IsAdding = true; ClearAddForm(); }">
-        <i class="bi bi-person-plus-fill me-1"></i>Add User
-    </button>
+<div style="display: flex; justify-content: flex-end; margin-bottom: 1rem;">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="() => { IsAdding = true; ClearAddForm(); }">Add User</MudButton>
 </div>
 
 @if (IsAdding)
 {
-    <div class="card mb-4 border-primary">
-        <div class="card-header bg-primary text-white fw-semibold">New User</div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Username</label>
-                    <input class="form-control" @bind="NewUsername" placeholder="username" />
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold">Email</label>
-                    <input class="form-control" @bind="NewEmail" placeholder="user@example.com" type="email" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Password</label>
-                    <input class="form-control" @bind="NewPassword" type="password" placeholder="Min 8 characters" />
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label fw-semibold">Role</label>
-                    <select class="form-select" @bind="NewRole">
+    <MudCard Class="mb-4" Elevation="2" Style="border-top: 4px solid var(--mud-palette-primary);">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">New User</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="NewUsername" Label="Username" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Placeholder="username" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="NewEmail" Label="Email" Variant="Variant.Outlined"
+                                  InputType="InputType.Email" Margin="Margin.Dense" Placeholder="user@example.com" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="NewPassword" Label="Password" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Margin="Margin.Dense" Placeholder="Min 8 characters" />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudSelect T="string" @bind-Value="NewRole" Label="Role" Variant="Variant.Outlined"
+                               Margin="Margin.Dense">
                         @foreach (var role in AvailableRoles)
                         {
-                            <option value="@role">@role</option>
+                            <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
                         }
-                    </select>
-                </div>
-            </div>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
             @if (!string.IsNullOrEmpty(AddError))
             {
-                <div class="alert alert-danger py-2 mt-3 small">@AddError</div>
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@AddError</MudAlert>
             }
-            <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-primary" @onclick="CreateUserAsync">
-                    <i class="bi bi-person-check me-1"></i>Create
-                </button>
-                <button class="btn btn-outline-secondary" @onclick="() => IsAdding = false">Cancel</button>
-            </div>
-        </div>
-    </div>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+                       OnClick="CreateUserAsync">Create</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="() => IsAdding = false">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
+}
+
+@if (EditingUser is not null)
+{
+    var editIsProtected = EditingUser.UserName == ProtectedUsername;
+    var editIsSelf      = EditingUser.Id == CurrentUserId;
+    var roleReadOnly    = editIsProtected || editIsSelf;
+
+    <MudCard Class="mb-4" Elevation="2" Style="border-top: 4px solid var(--mud-palette-warning);">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" />
+                    <MudText Typo="Typo.h6">Edit User: @EditingUser.UserName</MudText>
+                </div>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="EditUsername" Label="Username" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Disabled="@editIsProtected"
+                                  HelperText="@(editIsProtected ? "Cannot change for protected admin." : null)" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="EditEmail" Label="Email" Variant="Variant.Outlined"
+                                  InputType="InputType.Email" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" md="3">
+                    <MudTextField @bind-Value="EditPassword" Label="New Password" Variant="Variant.Outlined"
+                                  InputType="InputType.Password" Margin="Margin.Dense"
+                                  Placeholder="Leave blank to keep existing"
+                                  HelperText="Min 8 characters. Leave blank to keep current." />
+                </MudItem>
+                <MudItem xs="12" md="2">
+                    <MudSelect T="string" @bind-Value="EditRole" Label="Role" Variant="Variant.Outlined"
+                               Margin="Margin.Dense" Disabled="@roleReadOnly"
+                               HelperText="@(roleReadOnly ? (editIsProtected ? "Cannot change for protected admin." : "Cannot change your own role.") : null)">
+                        @foreach (var role in AvailableRoles)
+                        {
+                            <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            @if (!string.IsNullOrEmpty(EditError))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@EditError</MudAlert>
+            }
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveEditAsync" Disabled="@IsSavingEdit">Save</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="CancelEdit">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
 }
 
 @if (UserList is null)
 {
-    <div class="d-flex align-items-center gap-2 text-muted">
-        <span class="spinner-border spinner-border-sm"></span> Loading users...
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+        <MudText Color="Color.Secondary">Loading users...</MudText>
     </div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-dark">
+    <MudPaper Elevation="1" Class="overflow-auto">
+        <MudSimpleTable Hover="true" Dense="true">
+            <thead>
                 <tr>
                     <th>Username</th>
                     <th>Email</th>
@@ -86,137 +145,66 @@ else
                     var isProtected = user.UserName == ProtectedUsername;
                     var isSelf = user.Id == CurrentUserId;
                     <tr>
-                        <td class="fw-semibold">
-                            @user.UserName
-                            @if (isSelf)
-                            {
-                                <span class="badge bg-secondary ms-1">you</span>
-                            }
-                            @if (isProtected)
-                            {
-                                <span class="badge bg-danger ms-1">protected</span>
-                            }
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">
+                                <span style="font-weight: 600;">@user.UserName</span>
+                                @if (isSelf)
+                                {
+                                    <MudChip T="string" Color="Color.Default" Size="Size.Small">you</MudChip>
+                                }
+                                @if (isProtected)
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">protected</MudChip>
+                                }
+                            </div>
                         </td>
-                        <td class="text-muted small">@user.Email</td>
+                        <td style="font-size: 0.875rem; color: var(--mud-palette-text-secondary);">@user.Email</td>
                         <td>
                             @foreach (var role in user.Roles)
                             {
-                                <span class="badge @RoleBadgeClass(role) me-1">@role</span>
+                                <MudChip T="string" Color="@RoleColor(role)" Size="Size.Small">@role</MudChip>
                             }
                         </td>
                         <td>
                             @if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
                             {
-                                <span class="badge bg-warning text-dark">Locked</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted small">—</span>
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">Locked</MudChip>
                             }
                         </td>
                         <td>
-                            <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-outline-primary"
-                                        title="Edit user"
-                                        @onclick="() => StartEdit(user)">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
+                            <div style="display: flex; gap: 0.125rem;">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                               OnClick="() => StartEdit(user)" />
                                 @if (!isProtected && !isSelf)
                                 {
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            title="Delete user"
-                                            @onclick="() => ConfirmDeleteUser(user)">
-                                        <i class="bi bi-person-x"></i>
-                                    </button>
+                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error" Size="Size.Small"
+                                                   OnClick="() => ConfirmDeleteUser(user)" />
                                 }
                             </div>
                         </td>
                     </tr>
                 }
             </tbody>
-        </table>
-    </div>
-    <div class="text-muted small">@UserList.Count user(s) total</div>
-}
-
-@if (EditingUser is not null)
-{
-    var editIsProtected = EditingUser.UserName == ProtectedUsername;
-    var editIsSelf      = EditingUser.Id == CurrentUserId;
-    var roleReadOnly    = editIsProtected || editIsSelf;
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-person-gear me-2"></i>Edit User</h5>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Username</label>
-                        <input class="form-control" @bind="EditUsername" placeholder="username"
-                               disabled="@editIsProtected" />
-                        @if (editIsProtected)
-                        {
-                            <div class="form-text">Username cannot be changed for the protected admin account.</div>
-                        }
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Email</label>
-                        <input class="form-control" @bind="EditEmail" type="email" placeholder="user@example.com" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">New Password</label>
-                        <input class="form-control" @bind="EditPassword" type="password" placeholder="Leave blank to keep existing" />
-                        <div class="form-text">Min 8 characters. Leave blank to keep the current password.</div>
-                    </div>
-                    <div class="mb-0">
-                        <label class="form-label fw-semibold">Role</label>
-                        <select class="form-select" @bind="EditRole" disabled="@roleReadOnly">
-                            @foreach (var role in AvailableRoles)
-                            {
-                                <option value="@role">@role</option>
-                            }
-                        </select>
-                        @if (roleReadOnly)
-                        {
-                            <div class="form-text">
-                                @(editIsProtected ? "Role cannot be changed for the protected admin account." : "You cannot change your own role.")
-                            </div>
-                        }
-                    </div>
-                    @if (!string.IsNullOrEmpty(EditError))
-                    {
-                        <div class="alert alert-danger py-2 mt-3 small mb-0">@EditError</div>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-primary" @onclick="SaveEditAsync" disabled="@IsSavingEdit">
-                        <i class="bi bi-floppy me-1"></i>Save
-                    </button>
-                    <button class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </div>
+        </MudSimpleTable>
+    </MudPaper>
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">@UserList.Count user(s) total</MudText>
 }
 
 @if (DeletingUser is not null)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                </div>
-                <div class="modal-body">
-                    Delete user <strong>@DeletingUser.UserName</strong>? This cannot be undone.
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-danger" @onclick="DeleteUserConfirmedAsync">Delete</button>
-                    <button class="btn btn-secondary" @onclick="() => DeletingUser = null">Cancel</button>
-                </div>
-            </div>
-        </div>
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudCard Style="width: 380px;">
+            <MudCardHeader>
+                <CardHeaderContent><MudText Typo="Typo.h6">Confirm Delete</MudText></CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                Delete user <strong>@DeletingUser.UserName</strong>? This cannot be undone.
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteConfirmedAsync">Delete</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="() => DeletingUser = null">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
     </div>
 }
 
@@ -229,7 +217,6 @@ else
     private List<string> AvailableRoles { get; set; } = [];
     private string? CurrentUserId { get; set; }
     private string CurrentUsername { get; set; } = string.Empty;
-    private UserViewModel? DeletingUser { get; set; }
 
     // Add form
     private bool IsAdding { get; set; }
@@ -239,7 +226,10 @@ else
     private string NewRole { get; set; } = "Viewer";
     private string AddError { get; set; } = string.Empty;
 
-    // Edit modal
+    // Delete confirmation
+    private UserViewModel? DeletingUser { get; set; }
+
+    // Edit panel
     private UserViewModel? EditingUser { get; set; }
     private string EditUsername { get; set; } = string.Empty;
     private string EditEmail { get; set; } = string.Empty;
@@ -311,6 +301,7 @@ else
         EditRole = user.Roles.FirstOrDefault() ?? AvailableRoles.FirstOrDefault() ?? string.Empty;
         EditError = string.Empty;
         IsSavingEdit = false;
+        IsAdding = false;
     }
 
     private void CancelEdit()
@@ -340,7 +331,6 @@ else
             bool isSelf = EditingUser.Id == CurrentUserId;
             var changes = new List<string>();
 
-            // Username (blocked for protected account)
             if (!isProtected && appUser.UserName != EditUsername.Trim())
             {
                 var r = await UserManager.SetUserNameAsync(appUser, EditUsername.Trim());
@@ -348,7 +338,6 @@ else
                 changes.Add($"username: {EditingUser.UserName} → {EditUsername.Trim()}");
             }
 
-            // Email
             var trimmedEmail = EditEmail.Trim();
             if (appUser.Email != trimmedEmail)
             {
@@ -360,7 +349,6 @@ else
                 changes.Add("email updated");
             }
 
-            // Password (optional)
             if (!string.IsNullOrWhiteSpace(EditPassword))
             {
                 var token = await UserManager.GeneratePasswordResetTokenAsync(appUser);
@@ -369,7 +357,6 @@ else
                 changes.Add("password reset");
             }
 
-            // Role (blocked for protected account and self)
             if (!isProtected && !isSelf)
             {
                 var currentRoles = await UserManager.GetRolesAsync(appUser);
@@ -395,7 +382,7 @@ else
 
     private void ConfirmDeleteUser(UserViewModel user) => DeletingUser = user;
 
-    private async Task DeleteUserConfirmedAsync()
+    private async Task DeleteConfirmedAsync()
     {
         if (DeletingUser is null) return;
         var user = await UserManager.FindByIdAsync(DeletingUser.Id);
@@ -414,12 +401,13 @@ else
         NewRole = "Viewer";
     }
 
-    private static string RoleBadgeClass(string role) => role switch
+    private static Color RoleColor(string role) => role switch
     {
-        "Admin" => "bg-danger",
-        "Operator" => "bg-primary",
-        "Viewer" => "bg-secondary",
-        _ => "bg-dark"
+        "Admin"     => Color.Error,
+        "Developer" => Color.Tertiary,
+        "Operator"  => Color.Primary,
+        "Viewer"    => Color.Default,
+        _           => Color.Dark
     };
 
     private record UserViewModel(string Id, string UserName, string Email, List<string> Roles, DateTimeOffset? LockoutEnd);

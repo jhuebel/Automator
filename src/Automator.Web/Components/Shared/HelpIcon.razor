@@ -1,26 +1,8 @@
-<span class="position-relative d-inline-block">
-    <button type="button"
-            class="btn btn-link btn-sm p-0 ms-1 text-decoration-none"
-            style="line-height: 1; vertical-align: baseline;"
-            @onclick="Toggle"
-            @onclick:stopPropagation="true">
-        <i class="bi bi-question-circle@(_visible ? "-fill" : "") text-info" style="font-size: 0.8rem;"></i>
-    </button>
-    @if (_visible)
-    {
-        <div class="card border-info shadow-sm"
-             style="position: absolute; left: 0; top: 1.4rem; min-width: 250px; max-width: 340px; z-index: 1050; white-space: normal; font-weight: normal; font-size: 0.85rem;">
-            <div class="card-body p-2 text-body lh-sm">
-                <button type="button" class="btn-close float-end ms-2" style="font-size: 0.65rem;"
-                        @onclick="Toggle" @onclick:stopPropagation="true"></button>
-                <i class="bi bi-info-circle-fill text-info me-1"></i>@Text
-            </div>
-        </div>
-    }
-</span>
+<MudTooltip Text="@Text" Placement="Placement.Right" Arrow="true" RootStyle="display: inline;">
+    <MudIcon Icon="@Icons.Material.Outlined.HelpOutline" Size="Size.Small" Color="Color.Info"
+             Style="vertical-align: middle; font-size: 1rem; cursor: help;" />
+</MudTooltip>
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
-    private bool _visible;
-    private void Toggle() => _visible = !_visible;
 }
