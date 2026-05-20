@@ -69,6 +69,10 @@ pre {
     color: white !important;
 }
 
+.app-logo-bolt.mud-icon-root {
+    color: #FFD700 !important;
+}
+
 /* ── Header ── */
 .app-header {
     background: #212529;
