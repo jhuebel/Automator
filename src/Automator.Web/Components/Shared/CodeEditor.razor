@@ -1,0 +1,61 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div id="@_id" style="height: @Height; border: 1px solid var(--mud-palette-lines-inputs); border-radius: 4px; overflow: hidden;"></div>
+
+@code {
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public ScriptLanguage Language { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string Height { get; set; } = "300px";
+
+    private readonly string _id = "cm-" + Guid.NewGuid().ToString("N")[..8];
+    private DotNetObjectReference<CodeEditor>? _objRef;
+    private string _lastValue = string.Empty;
+    private ScriptLanguage _lastLanguage;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _objRef = DotNetObjectReference.Create(this);
+        _lastValue = Value;
+        _lastLanguage = Language;
+        await JS.InvokeVoidAsync("codeEditor.init", _id, Language.ToString(), Value, ReadOnly, ReadOnly ? null : _objRef);
+        _initialized = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_initialized) return;
+
+        if (Value != _lastValue)
+        {
+            _lastValue = Value;
+            await JS.InvokeVoidAsync("codeEditor.setValue", _id, Value);
+        }
+
+        if (Language != _lastLanguage)
+        {
+            _lastLanguage = Language;
+            await JS.InvokeVoidAsync("codeEditor.setLanguage", _id, Language.ToString());
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnChange(string value)
+    {
+        _lastValue = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+        {
+            try { await JS.InvokeVoidAsync("codeEditor.destroy", _id); } catch { }
+        }
+        _objRef?.Dispose();
+    }
+}

@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="lib/codemirror/codemirror.min.css" />
+    <link rel="stylesheet" href="lib/codemirror/theme/material-darker.css" />
     <link rel="stylesheet" href="app.css" />
     <HeadOutlet />
     <title>Automator</title>
@@ -13,6 +15,12 @@
 
 <body>
     <Routes @rendermode="InteractiveServer" />
+    <script src="lib/codemirror/codemirror.min.js"></script>
+    <script src="lib/codemirror/mode/shell/shell.js"></script>
+    <script src="lib/codemirror/mode/powershell/powershell.js"></script>
+    <script src="lib/codemirror/mode/python/python.js"></script>
+    <script src="lib/codemirror/mode/yaml/yaml.js"></script>
+    <script src="editor.js"></script>
     <script src="chart.umd.min.js?v=2"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js?v=2"></script>
     <script src="app.js?v=3"></script>

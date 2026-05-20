@@ -5,6 +5,8 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 ## Features
 
 - **Script Library** — store, organize, and version Bash, PowerShell, Python, and Ansible scripts
+- **Syntax-highlighted editor** — CodeMirror 5 editor with per-language highlighting and read-only source viewers
+- **AI assistant** — generate, improve, and explain scripts using Claude (Anthropic API); optional, falls back gracefully when unconfigured
 - **Live Script Runner** — execute scripts and stream output in real time with cancel support
 - **Job Scheduler** — cron-based scheduling with a background service, live next-run preview, and per-job enable/disable
 - **Execution History** — searchable log of every run with exit codes and full output
@@ -31,6 +33,20 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 | Developer | create / edit / delete | yes | create / edit / delete | — |
 | Operator | view | yes | view | — |
 | Viewer | view | — | view | — |
+
+## AI Assistant (optional)
+
+The script editor includes a Claude-powered AI assistant that can generate scripts from a description, improve existing scripts, and explain what a script does in plain language. It requires an [Anthropic API key](https://console.anthropic.com/settings/keys) and is completely optional — the editor functions normally without it.
+
+To enable it: **Settings → AI Assistant** → paste your API key → choose a model → Save.
+
+| Model | Best for |
+|---|---|
+| Haiku 4.5 | Fast iteration, low cost |
+| Sonnet 4.6 | Balanced quality and speed (default) |
+| Opus 4.7 | Complex scripts requiring deep reasoning |
+
+API usage is billed per token by Anthropic. See [anthropic.com/pricing](https://www.anthropic.com/pricing) for current rates. The key is stored in `automator.db` — secure the file with appropriate filesystem permissions.
 
 ## Prerequisites
 
@@ -91,7 +107,7 @@ Automator/
 │       ├── Components/
 │       │   ├── Layout/         # Shell layout, nav sidebar, header
 │       │   ├── Pages/          # Dashboard, Script Library, Runner, History, Jobs, Settings
-│       │   └── Shared/         # UserManagementPanel, SystemStatusPanel, PageHelp, HelpIcon
+│       │   └── Shared/         # UserManagementPanel, SystemStatusPanel, CodeEditor, PageHelp, HelpIcon
 │       ├── Data/
 │       │   ├── AutomatorDbContext.cs   # EF Core context (Scripts, ExecutionHistory, ScheduledJobs, Settings, AuditLogs)
 │       │   └── DataSeeder.cs           # First-run role, user, and settings seeding
@@ -101,8 +117,10 @@ Automator/
 │       │   ├── JobSchedulerService         # Cron job store backed by SQLite
 │       │   ├── SchedulerBackgroundService  # 15s tick, fires due jobs
 │       │   ├── AuditLogService             # Writes audit entries to DB
+│       │   ├── ClaudeService               # Anthropic API client with SSE streaming
 │       │   └── DependencyCheckService      # Probes runtimes for System Status page
 │       └── wwwroot/
+│           └── lib/codemirror/             # CodeMirror 5 — vendored, no CDN dependency
 └── Automator.sln
 ```
 
@@ -127,4 +145,6 @@ Jobs use standard 5-field cron syntax: `minute hour day month day-of-week`
 - [Entity Framework Core 9 + SQLite](https://learn.microsoft.com/ef/core) — persistent storage, no external database required
 - [MudBlazor 9](https://mudblazor.com) — component library
 - [Chart.js 4](https://www.chartjs.org) — dashboard execution chart
+- [CodeMirror 5](https://codemirror.net/5/) — syntax-highlighted script editor and source viewers (vendored locally)
 - [Cronos](https://github.com/HangfireIO/Cronos) — cron expression parsing
+- [Anthropic API](https://docs.anthropic.com/en/api/getting-started) — Claude AI assistant (optional)

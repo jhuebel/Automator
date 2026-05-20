@@ -70,6 +70,72 @@
         </div>
     </MudTabPanel>
 
+    <MudTabPanel Text="AI Assistant" Icon="@Icons.Material.Filled.AutoAwesome">
+        <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                The AI Assistant uses the <MudLink Href="https://docs.anthropic.com/en/api/getting-started" Target="_blank">Anthropic API</MudLink>
+                to generate, improve, and explain scripts directly inside the script editor.
+                To get started you need an API key:
+                <ol style="margin: 0.5rem 0 0; padding-left: 1.25rem; font-size: 0.875rem;">
+                    <li>Go to <MudLink Href="https://console.anthropic.com/settings/keys" Target="_blank">console.anthropic.com/settings/keys</MudLink> and sign in (or create a free account).</li>
+                    <li>Click <strong>Create Key</strong>, give it a name (e.g. "Automator"), and copy the key — it starts with <code>sk-ant-</code>.</li>
+                    <li>Paste the key into the field below and click <strong>Save</strong>.</li>
+                    <li>API usage is billed per token. See <MudLink Href="https://www.anthropic.com/pricing" Target="_blank">anthropic.com/pricing</MudLink> for current rates.</li>
+                </ol>
+            </PageHelp>
+            <div style="max-width: 520px;">
+                @if (AppSettings is not null)
+                {
+                    <MudCard Elevation="1">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" />
+                                    <MudText Typo="Typo.h6">Claude AI Settings</MudText>
+                                    @if (!string.IsNullOrWhiteSpace(AppSettings.AnthropicApiKey))
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Class="ma-0">Configured</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Default" Size="Size.Small" Class="ma-0">Not configured</MudChip>
+                                    }
+                                </div>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudTextField @bind-Value="AppSettings.AnthropicApiKey"
+                                          Label="Anthropic API Key"
+                                          InputType="@(_showApiKey ? InputType.Text : InputType.Password)"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3"
+                                          Adornment="Adornment.End"
+                                          AdornmentIcon="@(_showApiKey ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                          OnAdornmentClick="() => _showApiKey = !_showApiKey"
+                                          Placeholder="sk-ant-..." />
+                            <MudSelect T="string" @bind-Value="AppSettings.AnthropicModel"
+                                       Label="Model" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                                <MudSelectItem T="string" Value="@("claude-haiku-4-5-20251001")">Haiku 4.5 — fastest, lowest cost</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("claude-sonnet-4-6")">Sonnet 4.6 — balanced (recommended)</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("claude-opus-4-7")">Opus 4.7 — most capable</MudSelectItem>
+                            </MudSelect>
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                                The API key is stored in <code>automator.db</code>. Restrict filesystem access to protect it.
+                            </MudAlert>
+                            @if (!string.IsNullOrEmpty(AiSettingsMessage))
+                            {
+                                <MudAlert Severity="@(AiSettingsSuccess ? Severity.Success : Severity.Error)" Dense="true" Class="mt-2">@AiSettingsMessage</MudAlert>
+                            }
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="SaveAiSettingsAsync" Disabled="@IsSavingAiSettings">Save</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                }
+            </div>
+        </div>
+    </MudTabPanel>
+
     <MudTabPanel Text="Audit Logs" Icon="@Icons.Material.Filled.ListAlt">
         <div style="padding: 1.5rem 0;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -142,6 +208,11 @@
     private string AppSettingsMessage { get; set; } = string.Empty;
     private bool AppSettingsSuccess { get; set; }
 
+    private bool IsSavingAiSettings { get; set; }
+    private string AiSettingsMessage { get; set; } = string.Empty;
+    private bool AiSettingsSuccess { get; set; }
+    private bool _showApiKey;
+
     private IReadOnlyList<AuditLog>? AuditLogs { get; set; }
     private string AuditFilter { get; set; } = string.Empty;
 
@@ -155,22 +226,23 @@
         var tabName = query["tab"] ?? "application";
         _activePanelIndex = tabName switch
         {
-            "users" => 1,
+            "users"  => 1,
             "status" => 2,
-            "audit" => 3,
+            "ai"     => 3,
+            "audit"  => 4,
             _ => 0
         };
 
         using var db = DbFactory.CreateDbContext();
         AppSettings = db.Settings.Find(1) ?? new AppSetting { Id = 1 };
 
-        if (_activePanelIndex == 3)
+        if (_activePanelIndex == 4)
             LoadAuditLogs();
     }
 
     private void OnTabChanged()
     {
-        if (_activePanelIndex == 3)
+        if (_activePanelIndex == 4)
             LoadAuditLogs();
     }
 
@@ -222,6 +294,32 @@
             AppSettingsMessage = $"Save failed: {ex.Message}";
         }
         finally { IsSavingAppSettings = false; }
+    }
+
+    private async Task SaveAiSettingsAsync()
+    {
+        if (AppSettings is null) return;
+        IsSavingAiSettings = true;
+        try
+        {
+            using var db = DbFactory.CreateDbContext();
+            if (db.Settings.Find(1) is null)
+                db.Settings.Add(AppSettings);
+            else
+                db.Settings.Update(AppSettings);
+            await db.SaveChangesAsync();
+            AiSettingsSuccess = true;
+            AiSettingsMessage = "AI settings saved.";
+            _ = AuditService.LogAsync("Settings.AI.Updated", null,
+                $"model={AppSettings.AnthropicModel}, key={(string.IsNullOrWhiteSpace(AppSettings.AnthropicApiKey) ? "cleared" : "set")}",
+                _username);
+        }
+        catch (Exception ex)
+        {
+            AiSettingsSuccess = false;
+            AiSettingsMessage = $"Save failed: {ex.Message}";
+        }
+        finally { IsSavingAiSettings = false; }
     }
 
     private static Color ActionColor(string action) => action switch

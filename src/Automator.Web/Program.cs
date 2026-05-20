@@ -48,6 +48,8 @@ builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
 builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
 builder.Services.AddHostedService<SchedulerBackgroundService>();
+builder.Services.AddHttpClient<ClaudeService>();
+builder.Services.AddScoped<IClaudeService, ClaudeService>();
 builder.Services.AddMudServices();
 
 var app = builder.Build();
@@ -91,6 +93,16 @@ using (var scope = app.Services.CreateScope())
             "Details"   TEXT    NULL
         )
         """);
+
+    // Add AI settings columns for existing databases (EnsureCreated won't ALTER existing tables)
+    var settingsCols = db.Database
+        .SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Settings')")
+        .ToList();
+    if (!settingsCols.Contains("AnthropicApiKey"))
+        db.Database.ExecuteSqlRaw("ALTER TABLE Settings ADD COLUMN AnthropicApiKey TEXT NULL");
+    if (!settingsCols.Contains("AnthropicModel"))
+        db.Database.ExecuteSqlRaw(
+            "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
 
     var orphaned = db.ExecutionHistory.Where(r => r.CompletedAt == null).ToList();
     foreach (var r in orphaned)
