@@ -11,37 +11,27 @@ window.blazorCharts = (function () {
         }
 
         charts[canvasId] = new Chart(canvas, {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels,
                 datasets: [
                     {
-                        label: 'Total',
-                        data: total,
-                        borderColor: '#0d6efd',
-                        backgroundColor: 'rgba(13,110,253,0.07)',
-                        fill: true,
-                        tension: 0.35,
-                        pointRadius: 3,
-                        borderWidth: 2
-                    },
-                    {
                         label: 'Successful',
                         data: success,
+                        backgroundColor: 'rgba(25,135,84,0.85)',
                         borderColor: '#198754',
-                        backgroundColor: 'transparent',
-                        tension: 0.35,
-                        pointRadius: 3,
-                        borderWidth: 2
+                        borderWidth: 1,
+                        borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 3, bottomRight: 3 },
+                        borderSkipped: 'bottom'
                     },
                     {
                         label: 'Failed',
                         data: failed,
+                        backgroundColor: 'rgba(220,53,69,0.85)',
                         borderColor: '#dc3545',
-                        backgroundColor: 'transparent',
-                        tension: 0.35,
-                        pointRadius: 3,
-                        borderWidth: 2
+                        borderWidth: 1,
+                        borderRadius: { topLeft: 3, topRight: 3, bottomLeft: 0, bottomRight: 0 },
+                        borderSkipped: 'bottom'
                     }
                 ]
             },
@@ -53,8 +43,12 @@ window.blazorCharts = (function () {
                     legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } }
                 },
                 scales: {
-                    x: { grid: { color: 'rgba(0,0,0,0.05)' } },
+                    x: {
+                        stacked: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' }
+                    },
                     y: {
+                        stacked: true,
                         beginAtZero: true,
                         ticks: {
                             stepSize: 1,
