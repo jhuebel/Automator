@@ -50,6 +50,9 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="3">
+                    <div style="font-size: 0.75rem; color: var(--mud-palette-text-secondary); margin-bottom: 2px;">
+                        Tags <HelpIcon Text="Comma-separated keywords used to filter scripts. Example: 'backup, cron, linux'" />
+                    </div>
                     <MudTextField @bind-Value="TagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Placeholder="e.g. network, diagnostics"
                                   HelperText="Comma-separated keywords" />

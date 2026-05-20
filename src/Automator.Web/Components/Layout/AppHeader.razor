@@ -1,3 +1,5 @@
+@inject HelpDrawerState HelpState
+
 <AuthorizeView>
     <Authorized>
         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -13,6 +15,11 @@
             <AuthorizeView Roles="Viewer" Context="_v">
                 <MudChip T="string" Color="Color.Default" Size="Size.Small" Class="ma-0">Viewer</MudChip>
             </AuthorizeView>
+            <MudIconButton Icon="@Icons.Material.Outlined.HelpOutline"
+                           Size="Size.Small"
+                           OnClick="HelpState.Toggle"
+                           Style="color: rgba(255,255,255,0.7);"
+                           title="Help" />
             <MudMenu Label="@context.User.Identity?.Name"
                      EndIcon="@Icons.Material.Filled.ArrowDropDown"
                      AnchorOrigin="Origin.BottomRight"

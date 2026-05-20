@@ -4,7 +4,14 @@
 
 <PageTitle>Execution History - Automator</PageTitle>
 
-<MudText Typo="Typo.h5" Class="mb-4">Execution History</MudText>
+<MudText Typo="Typo.h5" Class="mb-3">Execution History</MudText>
+
+<PageHelp>
+    Every script execution is recorded here — whether run manually or by a scheduled job. Click any row to expand
+    the full terminal output. Status icons: <strong>green check</strong> = success (exit code 0),
+    <strong>red X</strong> = failure (non-zero exit code), <strong>spinner</strong> = currently running.
+    <strong>Duration</strong> is wall-clock time; <strong>Exit Code 0</strong> means success.
+</PageHelp>
 
 @if (!ScriptService.ExecutionHistory.Any())
 {

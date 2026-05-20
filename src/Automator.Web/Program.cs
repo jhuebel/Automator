@@ -50,6 +50,7 @@ builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
 builder.Services.AddHostedService<SchedulerBackgroundService>();
 builder.Services.AddHttpClient<ClaudeService>();
 builder.Services.AddScoped<IClaudeService, ClaudeService>();
+builder.Services.AddScoped<HelpDrawerState>();
 builder.Services.AddMudServices();
 
 var app = builder.Build();

@@ -1,0 +1,48 @@
+<MudText Typo="Typo.h6" Class="mb-1">Settings</MudText>
+@if (!Compact)
+{
+    <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+        Administrative configuration for the application. Accessible to <strong>Admins only</strong>.
+    </MudText>
+}
+
+<MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Application Tab</MudText>
+<ul style="margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.875rem;">
+    <li><strong>Execution Timeout</strong> — maximum seconds a script may run before it is automatically cancelled (default: 300)</li>
+    <li><strong>Max Concurrent Executions</strong> — how many scripts may run simultaneously; changing this requires a restart (default: 5)</li>
+    <li><strong>History Retention</strong> — how many execution records to keep in the history log (default: 1000)</li>
+</ul>
+
+<MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Users Tab</MudText>
+<ul style="margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.875rem;">
+    <li>Create new users with a username, email, password, and role.</li>
+    <li>Edit existing users to update email, role, or disable their account.</li>
+    <li>Roles: <strong>Admin</strong> (full access), <strong>Developer</strong> (scripts + jobs, no admin), <strong>Operator</strong> (run only), <strong>Viewer</strong> (read-only)</li>
+</ul>
+
+<MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">System Status Tab</MudText>
+<ul style="margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.875rem;">
+    <li>Shows whether each runtime (<code>bash</code>, <code>pwsh</code>, <code>python3</code>, <code>ansible-playbook</code>) is installed and on the PATH.</li>
+    <li>Green = found; Red = not found. Scripts in a language whose runtime is missing will fail at execution.</li>
+</ul>
+
+<MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">AI Assistant Tab</MudText>
+<ul style="margin: 0 0 0.75rem; padding-left: 1.25rem; font-size: 0.875rem;">
+    <li>Paste your Anthropic API key (starts with <code>sk-ant-</code>) to enable Claude in the script editor.</li>
+    <li>Choose the Claude model: <strong>Haiku</strong> (fast/cheap), <strong>Sonnet</strong> (balanced), or <strong>Opus</strong> (most capable).</li>
+    <li>The key is stored in <code>automator.db</code> — protect the file with filesystem permissions.</li>
+</ul>
+
+@if (!Compact)
+{
+    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Audit Logs Tab</MudText>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem;">
+        <li>Records all significant events: logins, script create/edit/delete, job changes, user management, settings updates.</li>
+        <li>Use the <strong>filter dropdown</strong> to narrow by action category.</li>
+        <li>Displays the most recent 200 entries.</li>
+    </ul>
+}
+
+@code {
+    [Parameter] public bool Compact { get; set; }
+}

@@ -1,0 +1,56 @@
+@inject HelpDrawerState HelpState
+@inject NavigationManager Nav
+@implements IDisposable
+
+@if (HelpState.IsOpen)
+{
+    <div class="help-overlay" @onclick="HelpState.Close"></div>
+}
+<div class="help-drawer @(HelpState.IsOpen ? "open" : "")">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <MudText Typo="Typo.h6">Help</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="HelpState.Close" title="Close" />
+    </div>
+
+    @CurrentSection()
+
+    <MudDivider Class="my-3" />
+    <MudLink Href="/help" @onclick="HelpState.Close">View full documentation →</MudLink>
+</div>
+
+@code {
+    private string _path = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _path = GetPath(Nav.Uri);
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _path = GetPath(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string GetPath(string uri)
+    {
+        var path = new Uri(uri).AbsolutePath.TrimStart('/').ToLowerInvariant();
+        var segment = path.Split('/')[0];
+        return segment;
+    }
+
+    private RenderFragment CurrentSection() => _path switch
+    {
+        "scripts"  => @<HelpScriptLibrary Compact="true" />,
+        "runner"   => @<HelpRunner Compact="true" />,
+        "jobs"     => @<HelpJobs Compact="true" />,
+        "history"  => @<HelpHistory Compact="true" />,
+        "settings" => @<HelpSettings Compact="true" />,
+        "profile"  => @<HelpProfile Compact="true" />,
+        "help"     => @<MudText Typo="Typo.body2" Color="Color.Secondary">You are viewing the full Help &amp; Documentation page.</MudText>,
+        _          => @<HelpDashboard Compact="true" />,
+    };
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

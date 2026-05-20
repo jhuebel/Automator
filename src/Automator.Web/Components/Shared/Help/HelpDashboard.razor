@@ -1,0 +1,38 @@
+<MudText Typo="Typo.h6" Class="mb-1">Dashboard</MudText>
+@if (!Compact)
+{
+    <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+        The dashboard gives you an at-a-glance view of the health and activity of your automation environment.
+    </MudText>
+}
+
+<MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Stat Cards</MudText>
+<MudText Typo="Typo.body2">
+    Each card is clickable and navigates to the related page:
+</MudText>
+<ul style="margin: 0.4rem 0 0.75rem; padding-left: 1.25rem; font-size: 0.875rem;">
+    <li><strong>Scripts</strong> — total scripts in the library</li>
+    <li><strong>Successful / Failed Runs</strong> — counts from execution history</li>
+    <li><strong>Running Now</strong> — live count of in-progress executions</li>
+    <li><strong>Active Schedules</strong> — enabled scheduled jobs</li>
+</ul>
+
+@if (!Compact)
+{
+    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Charts &amp; Lists</MudText>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem;">
+        <li><strong>Executions Over Time</strong> — bar chart of daily run counts for the last 14 days</li>
+        <li><strong>Scripts by Language</strong> — proportional breakdown of your script collection</li>
+        <li><strong>Recent Executions</strong> — the last 5 runs with status and timing</li>
+    </ul>
+
+    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-1">Tips</MudText>
+    <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem;">
+        <li>The <strong>Getting Started</strong> guide appears automatically when you have no scripts yet.</li>
+        <li>The chart and recent executions list update automatically while you have the page open.</li>
+    </ul>
+}
+
+@code {
+    [Parameter] public bool Compact { get; set; }
+}

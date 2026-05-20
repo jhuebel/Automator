@@ -60,12 +60,25 @@
 
     <MudTabPanel Text="Users" Icon="@Icons.Material.Filled.Group">
         <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                Create and manage user accounts. Each user is assigned one role:
+                <strong>Admin</strong> (full access including Settings),
+                <strong>Developer</strong> (create/edit scripts and jobs, run scripts),
+                <strong>Operator</strong> (run scripts and view jobs), or
+                <strong>Viewer</strong> (read-only). Disabling an account prevents login without deleting it.
+            </PageHelp>
             <UserManagementPanel />
         </div>
     </MudTabPanel>
 
     <MudTabPanel Text="System Status" Icon="@Icons.Material.Filled.Monitor">
         <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                Shows whether each script runtime is installed and reachable on the system PATH.
+                A <strong>green</strong> status means the runtime was found; <strong>red</strong> means it is missing —
+                scripts in that language will fail until the runtime is installed.
+                The detected path or version is shown alongside each entry.
+            </PageHelp>
             <SystemStatusPanel />
         </div>
     </MudTabPanel>
@@ -138,6 +151,11 @@
 
     <MudTabPanel Text="Audit Logs" Icon="@Icons.Material.Filled.ListAlt">
         <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                A tamper-evident record of significant events: logins, script create/edit/delete/run, job changes,
+                user management, and settings updates. Use the <strong>filter dropdown</strong> to narrow by action category.
+                Displays the most recent <strong>200 entries</strong>; older entries are not shown but remain in the database.
+            </PageHelp>
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                 <MudSelect T="string" @bind-Value="AuditFilter" @bind-Value:after="FilterLogs"
                            Label="Filter by action" Variant="Variant.Outlined" Margin="Margin.Dense"
