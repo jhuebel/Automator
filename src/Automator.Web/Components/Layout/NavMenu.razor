@@ -21,12 +21,17 @@
     </MudNavMenu>
 
     <div class="app-sidebar-footer">
-        <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.45);">
-            Bash · PowerShell · Python · Ansible
-        </MudText>
-        <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.25); margin-top: 0.25rem;">
-            v@_version
-        </MudText>
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.35);">v@_version</MudText>
+            <MudTooltip Text="View on GitHub">
+                <MudIconButton Icon="@Icons.Custom.Brands.GitHub"
+                               Href="https://github.com/jhuebel/Automator"
+                               Target="_blank"
+                               Size="Size.Small"
+                               Style="color: rgba(255,255,255,0.35); padding: 4px;"
+                               title="GitHub" />
+            </MudTooltip>
+        </div>
     </div>
 </div>
 
