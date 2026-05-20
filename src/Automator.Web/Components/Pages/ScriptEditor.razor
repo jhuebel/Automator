@@ -5,6 +5,7 @@
 @inject IAuditLogService AuditService
 @inject IClaudeService Claude
 @inject NavigationManager Nav
+@implements IDisposable
 
 <PageTitle>@(_isNew ? "New Script" : $"Edit: {_script.Name}") - Automator</PageTitle>
 
@@ -27,11 +28,11 @@
         <div style="flex-shrink: 0; padding: 16px 16px 0;">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_script.Name" Label="Name" Variant="Variant.Outlined"
+                    <MudTextField @bind-Value="_script.Name" @bind-Value:after="MarkDirty" Label="Name" Variant="Variant.Outlined"
                                   Placeholder="Script name" Margin="Margin.Dense" />
                 </MudItem>
                 <MudItem xs="12" md="3">
-                    <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" Label="Language"
+                    <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" @bind-Value:after="MarkDirty" Label="Language"
                                Variant="Variant.Outlined" Margin="Margin.Dense">
                         @foreach (var lang in Enum.GetValues<ScriptLanguage>())
                         {
@@ -40,12 +41,12 @@
                     </MudSelect>
                 </MudItem>
                 <MudItem xs="12" md="3">
-                    <MudTextField @bind-Value="_tagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
+                    <MudTextField @bind-Value="_tagsText" @bind-Value:after="MarkDirty" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Placeholder="e.g. network, diagnostics"
                                   HelperText="Comma-separated keywords" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_script.Description" Label="Description"
+                    <MudTextField @bind-Value="_script.Description" @bind-Value:after="MarkDirty" Label="Description"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
                 </MudItem>
             </MudGrid>
@@ -55,7 +56,7 @@
         <div style="flex: 1; min-height: 0; padding: 12px 16px 8px; display: flex; flex-direction: column;">
             <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary); display:block; margin-bottom:4px; flex-shrink:0;">Script Content</MudText>
             <div style="flex: 1; min-height: 0;">
-                <CodeEditor @bind-Value="_script.Content" Language="@_script.Language" Height="100%" />
+                <CodeEditor @bind-Value="_script.Content" @bind-Value:after="MarkDirty" Language="@_script.Language" Height="100%" />
             </div>
         </div>
 
@@ -128,6 +129,24 @@
     </div>
 </div>
 
+@if (_showUnsavedDialog)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <MudCard Style="width: 360px;">
+            <MudCardHeader>
+                <CardHeaderContent><MudText Typo="Typo.h6">Unsaved Changes</MudText></CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                You have unsaved changes. Leave without saving?
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DiscardAndNavigate">Discard changes</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="KeepEditing">Keep editing</MudButton>
+            </MudCardActions>
+        </MudCard>
+    </div>
+}
+
 @code {
     [Parameter] public Guid? Id { get; set; }
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
@@ -137,6 +156,10 @@
     private string _tagsText = string.Empty;
     private string _validationError = string.Empty;
     private bool _isNew;
+    private bool _isDirty;
+    private bool _showUnsavedDialog;
+    private string? _pendingNavUrl;
+    private IDisposable? _locationChangingReg;
 
     protected override async Task OnInitializedAsync()
     {
@@ -161,6 +184,40 @@
             _isNew = false;
         }
     }
+
+    private void MarkDirty() => _isDirty = true;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            _locationChangingReg = Nav.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        if (!_isDirty) return;
+        context.PreventNavigation();
+        _pendingNavUrl = context.TargetLocation;
+        _showUnsavedDialog = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void DiscardAndNavigate()
+    {
+        _isDirty = false;
+        _showUnsavedDialog = false;
+        var url = _pendingNavUrl ?? "/scripts";
+        _pendingNavUrl = null;
+        Nav.NavigateTo(url);
+    }
+
+    private void KeepEditing()
+    {
+        _showUnsavedDialog = false;
+        _pendingNavUrl = null;
+    }
+
+    public void Dispose() => _locationChangingReg?.Dispose();
 
     private void SaveScript()
     {
@@ -259,6 +316,7 @@
         finally
         {
             _aiRunning = false;
+            if (_aiMode != 2) _isDirty = true;
             _aiCts?.Dispose();
             _aiCts = null;
             await InvokeAsync(StateHasChanged);
