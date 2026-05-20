@@ -103,25 +103,27 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(new IdentityRole(role));
     }
 
-    // Seed default admin
+    // Seed default users
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    var adminConfig = app.Configuration.GetSection("DefaultAdmin");
-    var adminUsername = adminConfig["Username"] ?? "admin";
-    var adminEmail = adminConfig["Email"] ?? "admin@localhost";
-    var adminPassword = adminConfig["Password"] ?? "Admin1234!";
 
-    if (await userManager.FindByNameAsync(adminUsername) is null)
+    async Task SeedUserAsync(string section, string defaultUsername, string defaultEmail, string defaultPassword, string role)
     {
-        var adminUser = new ApplicationUser
+        var cfg = app.Configuration.GetSection(section);
+        var username = cfg["Username"] ?? defaultUsername;
+        var email = cfg["Email"] ?? defaultEmail;
+        var password = cfg["Password"] ?? defaultPassword;
+        if (await userManager.FindByNameAsync(username) is null)
         {
-            UserName = adminUsername,
-            Email = adminEmail,
-            EmailConfirmed = true
-        };
-        var result = await userManager.CreateAsync(adminUser, adminPassword);
-        if (result.Succeeded)
-            await userManager.AddToRoleAsync(adminUser, "Admin");
+            var user = new ApplicationUser { UserName = username, Email = email, EmailConfirmed = true };
+            var result = await userManager.CreateAsync(user, password);
+            if (result.Succeeded)
+                await userManager.AddToRoleAsync(user, role);
+        }
     }
+
+    await SeedUserAsync("DefaultAdmin",    "admin",    "admin@localhost",    "Admin1234!",    "Admin");
+    await SeedUserAsync("DefaultOperator", "operator", "operator@localhost", "Operator1234!", "Operator");
+    await SeedUserAsync("DefaultViewer",   "viewer",   "viewer@localhost",   "Viewer1234!",   "Viewer");
 
     // Seed default app settings
     if (!db.Settings.Any())
