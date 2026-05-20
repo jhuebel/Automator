@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject IScriptRunnerService ScriptService
+@inject IAuditLogService AuditService
 @inject NavigationManager Nav
 
 <PageTitle>Script Library - Automator</PageTitle>
@@ -163,6 +164,10 @@
 }
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _username = string.Empty;
+
     private ScriptDefinition EditingScript { get; set; } = new();
     private bool IsEditing { get; set; }
     private string ValidationError { get; set; } = string.Empty;
@@ -170,6 +175,12 @@
     private string SearchTerm { get; set; } = string.Empty;
     private string LanguageFilter { get; set; } = string.Empty;
     private ScriptDefinition? DeletingScript { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+            _username = (await AuthState).User.Identity?.Name ?? string.Empty;
+    }
 
     private IEnumerable<ScriptDefinition> FilteredScripts =>
         ScriptService.Scripts
@@ -218,10 +229,12 @@
         {
             EditingScript.Id = Guid.NewGuid();
             ScriptService.AddScript(EditingScript);
+            _ = AuditService.LogAsync("Script.Created", EditingScript.Name, EditingScript.Language.ToDisplayName(), _username);
         }
         else
         {
             ScriptService.UpdateScript(EditingScript);
+            _ = AuditService.LogAsync("Script.Updated", EditingScript.Name, EditingScript.Language.ToDisplayName(), _username);
         }
 
         IsEditing = false;
@@ -235,8 +248,10 @@
     {
         if (DeletingScript is not null)
         {
+            var name = DeletingScript.Name;
             ScriptService.DeleteScript(DeletingScript.Id);
             DeletingScript = null;
+            _ = AuditService.LogAsync("Script.Deleted", name, null, _username);
         }
     }
 

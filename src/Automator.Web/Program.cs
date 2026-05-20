@@ -39,6 +39,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddTransient<IDependencyCheckService, DependencyCheckService>();
+builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IScriptRunnerService, ScriptRunnerService>();
 builder.Services.AddSingleton<IJobSchedulerService, JobSchedulerService>();
 builder.Services.AddHostedService<SchedulerBackgroundService>();
@@ -70,6 +71,18 @@ using (var scope = app.Services.CreateScope())
             "ExecutionTimeoutSeconds"  INTEGER NOT NULL DEFAULT 300,
             "MaxConcurrentExecutions"  INTEGER NOT NULL DEFAULT 5,
             "MaxHistoryRecords"        INTEGER NOT NULL DEFAULT 1000
+        )
+        """);
+
+    // Add AuditLogs table for existing databases
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "AuditLogs" (
+            "Id"        INTEGER NOT NULL CONSTRAINT "PK_AuditLogs" PRIMARY KEY AUTOINCREMENT,
+            "Timestamp" TEXT    NOT NULL,
+            "Username"  TEXT    NULL,
+            "Action"    TEXT    NOT NULL,
+            "Resource"  TEXT    NULL,
+            "Details"   TEXT    NULL
         )
         """);
 

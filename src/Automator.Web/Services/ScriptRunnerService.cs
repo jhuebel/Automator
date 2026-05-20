@@ -9,12 +9,14 @@ namespace Automator.Web.Services;
 public class ScriptRunnerService : IScriptRunnerService
 {
     private readonly IDbContextFactory<AutomatorDbContext> _dbFactory;
+    private readonly IAuditLogService _audit;
     private readonly ILogger<ScriptRunnerService> _logger;
     private readonly SemaphoreSlim _executionLock;
 
-    public ScriptRunnerService(IDbContextFactory<AutomatorDbContext> dbFactory, ILogger<ScriptRunnerService> logger)
+    public ScriptRunnerService(IDbContextFactory<AutomatorDbContext> dbFactory, IAuditLogService audit, ILogger<ScriptRunnerService> logger)
     {
         _dbFactory = dbFactory;
+        _audit = audit;
         _logger = logger;
         using var db = dbFactory.CreateDbContext();
         var maxConcurrent = db.Settings.Find(1)?.MaxConcurrentExecutions ?? 5;
@@ -71,7 +73,8 @@ public class ScriptRunnerService : IScriptRunnerService
     public async Task<ScriptExecutionResult> ExecuteScriptAsync(
         Guid scriptId,
         IProgress<OutputLine> progress,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? username = null)
     {
         ScriptDefinition script;
         AppSetting settings;
@@ -95,6 +98,7 @@ public class ScriptRunnerService : IScriptRunnerService
             await db.SaveChangesAsync(CancellationToken.None);
         }
 
+        await _audit.LogAsync("Script.Executed", script.Name, "started", username);
         await _executionLock.WaitAsync(cancellationToken);
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(settings.ExecutionTimeoutSeconds));
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
@@ -147,6 +151,9 @@ public class ScriptRunnerService : IScriptRunnerService
         {
             result.CompletedAt = DateTime.UtcNow;
             _executionLock.Release();
+
+            var outcome = result.IsSuccess ? $"exit {result.ExitCode}" : $"failed (exit {result.ExitCode})";
+            await _audit.LogAsync("Script.Executed", script.Name, outcome, username);
 
             using var db = _dbFactory.CreateDbContext();
             db.ExecutionHistory.Update(result);

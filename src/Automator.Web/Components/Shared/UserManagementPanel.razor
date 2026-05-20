@@ -1,5 +1,6 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject IAuditLogService AuditService
 
 <PageHelp>
     <strong>Role access levels:</strong>
@@ -160,6 +161,7 @@ else
     private List<UserViewModel>? UserList { get; set; }
     private List<string> AvailableRoles { get; set; } = [];
     private string? CurrentUserId { get; set; }
+    private string CurrentUsername { get; set; } = string.Empty;
     private UserViewModel? DeletingUser { get; set; }
 
     private bool IsAdding { get; set; }
@@ -175,6 +177,7 @@ else
         {
             var auth = await AuthState;
             CurrentUserId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            CurrentUsername = auth.User.Identity?.Name ?? string.Empty;
         }
 
         AvailableRoles = RoleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToList();
@@ -216,6 +219,7 @@ else
         }
 
         await UserManager.AddToRoleAsync(user, NewRole);
+        await AuditService.LogAsync("User.Created", NewUsername.Trim(), $"role: {NewRole}", CurrentUsername);
         IsAdding = false;
         await LoadUsersAsync();
     }
@@ -229,6 +233,7 @@ else
         var currentRoles = await UserManager.GetRolesAsync(appUser);
         await UserManager.RemoveFromRolesAsync(appUser, currentRoles);
         await UserManager.AddToRoleAsync(appUser, newRole);
+        await AuditService.LogAsync("User.RoleChanged", user.UserName, $"{string.Join(",", currentRoles)} → {newRole}", CurrentUsername);
         await LoadUsersAsync();
     }
 
@@ -238,7 +243,11 @@ else
     {
         if (DeletingUser is null) return;
         var user = await UserManager.FindByIdAsync(DeletingUser.Id);
-        if (user is not null) await UserManager.DeleteAsync(user);
+        if (user is not null)
+        {
+            await UserManager.DeleteAsync(user);
+            await AuditService.LogAsync("User.Deleted", DeletingUser.UserName, null, CurrentUsername);
+        }
         DeletingUser = null;
         await LoadUsersAsync();
     }

@@ -15,5 +15,6 @@ public interface IScriptRunnerService
     Task<ScriptExecutionResult> ExecuteScriptAsync(
         Guid scriptId,
         IProgress<OutputLine> progress,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? username = null);
 }

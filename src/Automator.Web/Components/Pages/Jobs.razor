@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @inject IJobSchedulerService Scheduler
 @inject IScriptRunnerService ScriptService
+@inject IAuditLogService AuditService
 @inject NavigationManager Nav
 
 <PageTitle>Scheduled Jobs - Automator</PageTitle>
@@ -247,10 +248,20 @@ else
 }
 
 @code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string _username = string.Empty;
+
     private ScheduledJob EditingJob { get; set; } = new() { Id = Guid.Empty };
     private bool IsEditing { get; set; }
     private string ValidationError { get; set; } = string.Empty;
     private ScheduledJob? DeletingJob { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+            _username = (await AuthState).User.Identity?.Name ?? string.Empty;
+    }
 
     private static readonly (string Label, string Cron)[] CronPresets =
     [
@@ -310,10 +321,12 @@ else
         {
             EditingJob.Id = Guid.NewGuid();
             Scheduler.AddJob(EditingJob);
+            _ = AuditService.LogAsync("Job.Created", EditingJob.Name, EditingJob.CronExpression, _username);
         }
         else
         {
             Scheduler.UpdateJob(EditingJob);
+            _ = AuditService.LogAsync("Job.Updated", EditingJob.Name, EditingJob.CronExpression, _username);
         }
 
         IsEditing = false;
@@ -332,6 +345,7 @@ else
         if (job.IsEnabled)
             job.NextRunAt = Scheduler.GetNextOccurrence(job.CronExpression);
         Scheduler.UpdateJob(job);
+        _ = AuditService.LogAsync(job.IsEnabled ? "Job.Enabled" : "Job.Disabled", job.Name, null, _username);
     }
 
     private void RunNow(ScheduledJob job) =>
@@ -343,8 +357,10 @@ else
     {
         if (DeletingJob is not null)
         {
+            var name = DeletingJob.Name;
             Scheduler.DeleteJob(DeletingJob.Id);
             DeletingJob = null;
+            _ = AuditService.LogAsync("Job.Deleted", name, null, _username);
         }
     }
 

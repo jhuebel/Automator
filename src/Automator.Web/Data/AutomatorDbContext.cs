@@ -15,6 +15,7 @@ public class AutomatorDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ScriptExecutionResult> ExecutionHistory => Set<ScriptExecutionResult>();
     public DbSet<ScheduledJob> ScheduledJobs => Set<ScheduledJob>();
     public DbSet<AppSetting> Settings => Set<AppSetting>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

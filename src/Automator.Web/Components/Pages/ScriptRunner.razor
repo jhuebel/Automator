@@ -134,12 +134,20 @@
 
 @code {
     [Parameter] public Guid? ScriptId { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    private string _username = string.Empty;
     private ScriptDefinition? SelectedScript { get; set; }
     private ScriptExecutionResult? CurrentResult { get; set; }
     private List<OutputLine> OutputLines { get; } = [];
     private bool IsRunning { get; set; }
     private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+            _username = (await AuthState).User.Identity?.Name ?? string.Empty;
+    }
 
     protected override void OnParametersSet()
     {
@@ -170,7 +178,7 @@
         try
         {
             CurrentResult = await ScriptService.ExecuteScriptAsync(
-                SelectedScript.Id, progress, _cts.Token);
+                SelectedScript.Id, progress, _cts.Token, _username);
         }
         finally
         {
