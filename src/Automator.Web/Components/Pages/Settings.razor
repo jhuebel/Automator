@@ -71,18 +71,6 @@
         </div>
     </MudTabPanel>
 
-    <MudTabPanel Text="System Status" Icon="@Icons.Material.Filled.Monitor">
-        <div style="padding: 1.5rem 0;">
-            <PageHelp>
-                Shows whether each script runtime is installed and reachable on the system PATH.
-                A <strong>green</strong> status means the runtime was found; <strong>red</strong> means it is missing —
-                scripts in that language will fail until the runtime is installed.
-                The detected path or version is shown alongside each entry.
-            </PageHelp>
-            <SystemStatusPanel />
-        </div>
-    </MudTabPanel>
-
     <MudTabPanel Text="AI Assistant" Icon="@Icons.Material.Filled.AutoAwesome">
         <div style="padding: 1.5rem 0;">
             <PageHelp>
@@ -146,6 +134,18 @@
                     </MudCard>
                 }
             </div>
+        </div>
+    </MudTabPanel>
+
+    <MudTabPanel Text="System Status" Icon="@Icons.Material.Filled.Monitor">
+        <div style="padding: 1.5rem 0;">
+            <PageHelp>
+                Shows whether each script runtime is installed and reachable on the system PATH.
+                A <strong>green</strong> status means the runtime was found; <strong>red</strong> means it is missing —
+                scripts in that language will fail until the runtime is installed.
+                The detected path or version is shown alongside each entry.
+            </PageHelp>
+            <SystemStatusPanel />
         </div>
     </MudTabPanel>
 
@@ -245,8 +245,8 @@
         _activePanelIndex = tabName switch
         {
             "users"  => 1,
-            "status" => 2,
-            "ai"     => 3,
+            "ai"     => 2,
+            "status" => 3,
             "audit"  => 4,
             _ => 0
         };
