@@ -133,8 +133,7 @@
                 <pre id="output-container" class="output-terminal" style="border-radius: 0 0 4px 4px;">@if (OutputLines.Count == 0)
 {<span style="color: #6b7280;">Select a script and click Run to see output here.</span>}
 @foreach (var line in OutputLines)
-{<span class="@(line.IsError ? "output-error" : "")">@line.Text
-</span>}</pre>
+{<span class="@(line.IsError ? "output-error" : "")">@(line.Text + "\n")</span>}</pre>
             </MudCardContent>
         </MudCard>
     </MudItem>

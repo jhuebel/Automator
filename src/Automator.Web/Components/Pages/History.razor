@@ -75,8 +75,7 @@ else
                         <tr>
                             <td colspan="7" style="padding: 0;">
                                 <pre class="output-terminal" style="border-radius: 0; min-height: unset; max-height: 300px;">@foreach (var line in run.Output)
-{<span class="@(line.IsError ? "output-error" : "")">@line.Text
-</span>}</pre>
+{<span class="@(line.IsError ? "output-error" : "")">@(line.Text + "\n")</span>}</pre>
                             </td>
                         </tr>
                     }
