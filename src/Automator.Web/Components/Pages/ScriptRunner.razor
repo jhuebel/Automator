@@ -68,12 +68,27 @@
                     {
                         <MudChip T="string" Color="Color.Default" Size="Size.Small">@tag</MudChip>
                     }
+                    @if (SelectedScript.Variables.Any(v => !string.IsNullOrWhiteSpace(v.Name)))
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Variables</MudText>
+                        @foreach (var v in SelectedScript.Variables.Where(v => !string.IsNullOrWhiteSpace(v.Name)))
+                        {
+                            <MudTextField @bind-Value="_variableValues[v.Name]"
+                                          Label="@(v.Required ? v.Name + " *" : v.Name)"
+                                          HelperText="@v.Description"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Class="mb-2" />
+                        }
+                    }
                 </MudCardContent>
                 <MudCardActions>
                     @if (!IsRunning)
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
-                                   StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="RunSelected">Run</MudButton>
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="RunSelected" Disabled="!CanRun">Run</MudButton>
                     }
                     else
                     {
@@ -149,6 +164,12 @@
     private List<OutputLine> OutputLines { get; } = [];
     private bool IsRunning { get; set; }
     private CancellationTokenSource? _cts;
+    private Dictionary<string, string> _variableValues = new();
+
+    private bool CanRun => SelectedScript is not null && !IsRunning &&
+        SelectedScript.Variables
+            .Where(v => !string.IsNullOrWhiteSpace(v.Name) && v.Required)
+            .All(v => _variableValues.TryGetValue(v.Name, out var val) && !string.IsNullOrWhiteSpace(val));
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,13 +180,25 @@
     protected override void OnParametersSet()
     {
         if (ScriptId.HasValue)
+        {
             SelectedScript = ScriptService.GetScript(ScriptId.Value);
+            InitVariableValues();
+        }
     }
 
     private void SelectScript(ScriptDefinition? script)
     {
         SelectedScript = script;
+        InitVariableValues();
         ClearOutput();
+    }
+
+    private void InitVariableValues()
+    {
+        _variableValues = SelectedScript?.Variables
+            .Where(v => !string.IsNullOrWhiteSpace(v.Name))
+            .ToDictionary(v => v.Name, v => v.DefaultValue)
+            ?? new Dictionary<string, string>();
     }
 
     private async Task RunSelected()
@@ -185,7 +218,7 @@
         try
         {
             CurrentResult = await ScriptService.ExecuteScriptAsync(
-                SelectedScript.Id, progress, _cts.Token, _username);
+                SelectedScript.Id, progress, _cts.Token, _username, new Dictionary<string, string>(_variableValues));
         }
         finally
         {

@@ -60,6 +60,36 @@
             </div>
         </div>
 
+        @* Variables *@
+        <div style="flex-shrink: 0; padding: 0 16px 8px;">
+            <MudExpansionPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject"
+                               Style="border: 1px solid var(--mud-palette-lines-inputs); border-radius:4px;">
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2" Style="display:block;">
+                    Variables are passed as environment variables at runtime.
+                    Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
+                </MudText>
+                @foreach (var v in _script.Variables)
+                {
+                    var variable = v;
+                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                        <MudTextField @bind-Value="variable.Name" Label="Name" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Style="width: 150px; flex-shrink: 0;"
+                                      Placeholder="VAR_NAME" />
+                        <MudTextField @bind-Value="variable.DefaultValue" Label="Default value" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Style="width: 160px; flex-shrink: 0;" />
+                        <MudTextField @bind-Value="variable.Description" Label="Description" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Style="flex: 1; min-width: 140px;" />
+                        <MudCheckBox T="bool" @bind-Value="variable.Required" Label="Required" Size="Size.Small"
+                                     Style="flex-shrink: 0; white-space: nowrap;" />
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                       title="Remove variable" OnClick="() => _script.Variables.Remove(variable)" />
+                    </div>
+                }
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                           OnClick="AddVariable">Add Variable</MudButton>
+            </MudExpansionPanel>
+        </div>
+
         @* AI assistant *@
         @if (Claude.IsConfigured)
         {
@@ -224,6 +254,8 @@
         _showUnsavedDialog = true;
         await InvokeAsync(StateHasChanged);
     }
+
+    private void AddVariable() => _script.Variables.Add(new ScriptVariable());
 
     private async Task TryNavigateBack()
     {

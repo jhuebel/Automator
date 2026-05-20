@@ -30,6 +30,12 @@ public class AutomatorDbContext : IdentityDbContext<ApplicationUser>
                 v => JsonSerializer.Serialize(v, JsonOptions),
                 v => JsonSerializer.Deserialize<List<string>>(v, JsonOptions) ?? new List<string>());
 
+        modelBuilder.Entity<ScriptDefinition>()
+            .Property(s => s.Variables)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, JsonOptions),
+                v => JsonSerializer.Deserialize<List<ScriptVariable>>(v, JsonOptions) ?? new List<ScriptVariable>());
+
         modelBuilder.Entity<ScriptExecutionResult>()
             .Property(r => r.Output)
             .HasConversion(

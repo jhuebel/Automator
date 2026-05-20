@@ -58,10 +58,16 @@ public class SchedulerBackgroundService : BackgroundService
         _logger.LogInformation("Firing scheduled job '{Name}' (script {ScriptId})", job.Name, job.ScriptId);
         try
         {
+            var script = _scriptRunner.GetScript(job.ScriptId);
+            var defaults = script?.Variables
+                .Where(v => !string.IsNullOrWhiteSpace(v.Name))
+                .ToDictionary(v => v.Name, v => v.DefaultValue);
+
             var result = await _scriptRunner.ExecuteScriptAsync(
                 job.ScriptId,
                 new Progress<OutputLine>(),
-                stoppingToken);
+                stoppingToken,
+                variables: defaults);
 
             _scheduler.RecordExecution(job.Id, result.ExitCode ?? -1);
         }

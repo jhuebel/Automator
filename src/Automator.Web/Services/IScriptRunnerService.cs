@@ -16,5 +16,6 @@ public interface IScriptRunnerService
         Guid scriptId,
         IProgress<OutputLine> progress,
         CancellationToken cancellationToken = default,
-        string? username = null);
+        string? username = null,
+        Dictionary<string, string>? variables = null);
 }

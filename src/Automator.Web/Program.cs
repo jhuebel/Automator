@@ -115,6 +115,12 @@ using (var scope = app.Services.CreateScope())
         if (!settingsCols.Contains("AnthropicModel"))
             db.Database.ExecuteSqlRaw(
                 "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+
+        var scriptCols = db.Database
+            .SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Scripts')")
+            .ToList();
+        if (!scriptCols.Contains("Variables"))
+            db.Database.ExecuteSqlRaw("ALTER TABLE Scripts ADD COLUMN Variables TEXT NOT NULL DEFAULT '[]'");
     }
     else
     {
@@ -128,6 +134,13 @@ using (var scope = app.Services.CreateScope())
         if (!settingsCols.Any(c => c.Equals("AnthropicModel", StringComparison.OrdinalIgnoreCase)))
             db.Database.ExecuteSqlRaw(
                 "ALTER TABLE `Settings` ADD COLUMN `AnthropicModel` TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+
+        var scriptCols = db.Database
+            .SqlQueryRaw<string>(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Scripts'")
+            .ToList();
+        if (!scriptCols.Any(c => c.Equals("Variables", StringComparison.OrdinalIgnoreCase)))
+            db.Database.ExecuteSqlRaw("ALTER TABLE `Scripts` ADD COLUMN `Variables` LONGTEXT NOT NULL DEFAULT ('[]')");
     }
 
     var orphaned = db.ExecutionHistory.Where(r => r.CompletedAt == null).ToList();

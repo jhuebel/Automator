@@ -74,7 +74,8 @@ public class ScriptRunnerService : IScriptRunnerService
         Guid scriptId,
         IProgress<OutputLine> progress,
         CancellationToken cancellationToken = default,
-        string? username = null)
+        string? username = null,
+        Dictionary<string, string>? variables = null)
     {
         ScriptDefinition script;
         AppSetting settings;
@@ -120,6 +121,11 @@ public class ScriptRunnerService : IScriptRunnerService
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+
+            if (variables is not null)
+                foreach (var (key, value) in variables)
+                    if (!string.IsNullOrWhiteSpace(key))
+                        psi.Environment[key] = value;
 
             using var process = Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start process");
