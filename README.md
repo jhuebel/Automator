@@ -88,6 +88,16 @@ Automator/
 └── Automator.sln
 ```
 
+## Screenshots
+
+| Dashboard | Script Editor |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Script Editor](docs/screenshots/script-editor.png) |
+
+| Scheduled Jobs | Settings — AI Assistant |
+|---|---|
+| ![Scheduled Jobs](docs/screenshots/scheduled-jobs.png) | ![Settings](docs/screenshots/settings-ai.png) |
+
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) — prerequisites, installation, and database configuration
