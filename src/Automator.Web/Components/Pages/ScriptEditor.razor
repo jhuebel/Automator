@@ -112,24 +112,21 @@
             </MudTabPanel>
             <MudTabPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject">
                 <div style="padding: 16px; overflow-y: auto; height: 100%;">
-                    @if (_script.Language == ScriptLanguage.Terraform)
-                    {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
-                            Variables are automatically prefixed with <code>TF_VAR_</code> and passed as environment variables at runtime.
-                            Declare a matching input variable in your HCL and reference it as <code>var.NAME</code>:
-                        </MudText>
-                        <MudPaper Elevation="0" Class="mb-3 pa-2" Style="background:var(--mud-palette-background-grey); border-radius:4px; font-family:monospace; font-size:0.8125rem; white-space:pre;">variable "NAME" {}
-
-resource "..." "..." {
-  value = var.NAME
-}</MudPaper>
+                    @{
+                        var _varHint = _script.Language switch
+                        {
+                            ScriptLanguage.Bash => ("Passed as environment variables. Access in your script:", "echo \"$NAME\""),
+                            ScriptLanguage.PowerShell => ("Passed as environment variables. Access in your script:", "$env:NAME"),
+                            ScriptLanguage.Python => ("Passed as environment variables. Access in your script:", "import os\nvalue = os.environ[\"NAME\"]"),
+                            ScriptLanguage.Ansible => ("Passed as environment variables. Read them in a task with the env lookup:", "- name: Use variable\n  debug:\n    msg: \"{{ lookup('env', 'NAME') }}\""),
+                            ScriptLanguage.Terraform => ("Passed as environment variables prefixed with TF_VAR_. Declare a matching input variable and reference it as var.NAME:", "variable \"NAME\" {}\n\nresource \"...\" \"...\" {\n  value = var.NAME\n}"),
+                            _ => (null, null)
+                        };
                     }
-                    else
+                    @if (_varHint.Item1 is not null)
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
-                            Variables are passed as environment variables at runtime.
-                            Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
-                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2" Style="display:block;">@_varHint.Item1</MudText>
+                        <MudPaper Elevation="0" Class="mb-3 pa-2" Style="background:var(--mud-palette-background-grey); border-radius:4px; font-family:monospace; font-size:0.8125rem; white-space:pre;">@_varHint.Item2</MudPaper>
                     }
                     @foreach (var v in _script.Variables)
                     {
