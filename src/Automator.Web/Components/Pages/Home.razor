@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @inject IScriptRunnerService ScriptService
 @inject IJobSchedulerService Scheduler
-@inject IJSRuntime JS
 
 <PageTitle>Dashboard - Automator</PageTitle>
 
@@ -33,8 +32,13 @@
             </div>
         </CardHeaderContent>
     </MudCardHeader>
-    <MudCardContent Style="height: 260px; position: relative; padding-top: 0;">
-        <canvas id="executionChart"></canvas>
+    <MudCardContent Style="padding-top: 0;">
+        <MudChart T="double"
+                  ChartType="ChartType.StackedBar"
+                  ChartSeries="@_chartSeries"
+                  ChartLabels="@_chartLabels"
+                  Width="100%" Height="260px"
+                  ChartOptions="@_chartOptions" />
     </MudCardContent>
 </MudCard>
 
@@ -190,31 +194,35 @@
     private int FailureCount => ScriptService.ExecutionHistory.Count(r => !r.IsRunning && !r.IsSuccess);
     private int RunningCount => ScriptService.ExecutionHistory.Count(r => r.IsRunning);
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private List<ChartSeries<double>> _chartSeries = [];
+    private string[] _chartLabels = [];
+    private readonly StackedBarChartOptions _chartOptions = new()
     {
-        if (!firstRender) return;
+        ChartPalette = ["#198754", "#dc3545"]
+    };
 
-        var history = ScriptService.ExecutionHistory
-            .Where(r => !r.IsRunning)
-            .ToList();
-
-        var today = DateTime.Now.Date;
-        var labels = new List<string>();
-        var total   = new List<int>();
-        var success = new List<int>();
-        var failed  = new List<int>();
+    protected override void OnInitialized()
+    {
+        var history = ScriptService.ExecutionHistory.Where(r => !r.IsRunning).ToList();
+        var today   = DateTime.Now.Date;
+        var labels  = new List<string>();
+        var success = new List<double>();
+        var failed  = new List<double>();
 
         for (int i = 13; i >= 0; i--)
         {
             var date = today.AddDays(-i);
-            var day = history.Where(r => r.StartedAt.ToLocalTime().Date == date).ToList();
+            var day  = history.Where(r => r.StartedAt.ToLocalTime().Date == date).ToList();
             labels.Add(date.ToString("MMM d"));
-            total.Add(day.Count);
             success.Add(day.Count(r => r.IsSuccess));
             failed.Add(day.Count(r => !r.IsSuccess));
         }
 
-        await JS.InvokeVoidAsync("blazorCharts.renderExecutionChart",
-            "executionChart", labels, total, success, failed);
+        _chartLabels = [.. labels];
+        _chartSeries =
+        [
+            new ChartSeries<double> { Name = "Successful", Data = new ChartData<double>(success) },
+            new ChartSeries<double> { Name = "Failed",      Data = new ChartData<double>(failed)  }
+        ];
     }
 }
