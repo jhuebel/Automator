@@ -65,16 +65,22 @@ To enable it: **Settings → AI Assistant** → paste your API key → choose a 
 
 ```
 Automator/
+├── packaging/
+│   ├── build.sh                    # builds linux-x64 and win-x64 release archives
+│   ├── linux-common/               # shared systemd unit and nginx config
+│   ├── ubuntu/                     # install.sh and uninstall.sh for Ubuntu
+│   ├── rhel/                       # install.sh and uninstall.sh for RHEL / Rocky / Alma
+│   └── windows/                    # install.ps1 and uninstall.ps1 for Windows Server
 ├── src/
 │   └── Automator.Web/
 │       ├── Components/
-│       │   ├── Layout/         # Shell layout, nav sidebar, header
-│       │   ├── Pages/          # Dashboard, Script Library, ScriptEditor, Runner, History, Jobs, Settings, Help
-│       │   └── Shared/         # CodeEditor, HelpDrawer, help sections, PageHelp, HelpIcon, panels
+│       │   ├── Layout/             # Shell layout, nav sidebar, header
+│       │   ├── Pages/              # Dashboard, Script Library, ScriptEditor, Runner, History, Jobs, Settings, Help
+│       │   └── Shared/             # CodeEditor, HelpDrawer, help sections, PageHelp, HelpIcon, panels
 │       ├── Data/
 │       │   ├── AutomatorDbContext.cs   # EF Core context
 │       │   └── DataSeeder.cs           # First-run role, user, and settings seeding
-│       ├── Models/             # ScriptDefinition, ScriptVariable, ScheduledJob, ScriptExecutionResult, AuditLog, AppSetting
+│       ├── Models/                 # ScriptDefinition, ScriptVariable, ScheduledJob, ScriptExecutionResult, AuditLog, AppSetting
 │       ├── Services/
 │       │   ├── ScriptRunnerService         # Executes scripts as subprocesses, persists results
 │       │   ├── JobSchedulerService         # Cron job store
@@ -100,7 +106,7 @@ Automator/
 
 ## Documentation
 
-- [docs/INSTALL.md](docs/INSTALL.md) — prerequisites, installation, and database configuration
+- [docs/INSTALL.md](docs/INSTALL.md) — pre-built packages, build from source, and configuration reference
 - [docs/USAGE.md](docs/USAGE.md) — script editor, variables, runner, scheduler, and cron reference
 
 ## License

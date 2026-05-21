@@ -22,7 +22,7 @@ info "Building Automator v${VERSION}..."
 mkdir -p "$OUTDIR"
 
 # ---------------------------------------------------------------------------
-# Linux x64  (shared by Ubuntu and RHEL install scripts)
+# Linux x64  (shared archive for Ubuntu and RHEL)
 # ---------------------------------------------------------------------------
 info "Publishing linux-x64..."
 dotnet publish src/Automator.Web \
@@ -33,9 +33,17 @@ dotnet publish src/Automator.Web \
     /p:PublishSingleFile=false \
     --nologo -q
 
-# Bundle shared config files
-cp packaging/linux-common/automator.service  "$BUILD_DIR/linux-x64/"
+# Bundle shared systemd + nginx configs
+cp packaging/linux-common/automator.service    "$BUILD_DIR/linux-x64/"
 cp packaging/linux-common/nginx-automator.conf "$BUILD_DIR/linux-x64/"
+
+# Bundle distro-specific install/uninstall scripts
+mkdir -p "$BUILD_DIR/linux-x64/packaging/ubuntu"
+mkdir -p "$BUILD_DIR/linux-x64/packaging/rhel"
+cp packaging/ubuntu/install.sh    "$BUILD_DIR/linux-x64/packaging/ubuntu/"
+cp packaging/ubuntu/uninstall.sh  "$BUILD_DIR/linux-x64/packaging/ubuntu/"
+cp packaging/rhel/install.sh      "$BUILD_DIR/linux-x64/packaging/rhel/"
+cp packaging/rhel/uninstall.sh    "$BUILD_DIR/linux-x64/packaging/rhel/"
 
 LINUX_ARCHIVE="$OUTDIR/automator-${VERSION}-linux-x64.tar.gz"
 info "Creating $LINUX_ARCHIVE..."
