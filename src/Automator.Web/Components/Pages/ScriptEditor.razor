@@ -112,10 +112,25 @@
             </MudTabPanel>
             <MudTabPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject">
                 <div style="padding: 16px; overflow-y: auto; height: 100%;">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
-                        Variables are passed as environment variables at runtime.
-                        Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
-                    </MudText>
+                    @if (_script.Language == ScriptLanguage.Terraform)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
+                            Variables are automatically prefixed with <code>TF_VAR_</code> and passed as environment variables at runtime.
+                            Declare a matching input variable in your HCL and reference it as <code>var.NAME</code>:
+                        </MudText>
+                        <MudPaper Elevation="0" Class="mb-3 pa-2" Style="background:var(--mud-palette-background-grey); border-radius:4px; font-family:monospace; font-size:0.8125rem; white-space:pre;">variable "NAME" {}
+
+resource "..." "..." {
+  value = var.NAME
+}</MudPaper>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
+                            Variables are passed as environment variables at runtime.
+                            Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
+                        </MudText>
+                    }
                     @foreach (var v in _script.Variables)
                     {
                         var variable = v;
