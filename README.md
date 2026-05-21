@@ -4,7 +4,7 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 
 ## Features
 
-- **Script Library** — store, organize, and search Bash, PowerShell, Python, and Ansible scripts
+- **Script Library** — store, organize, and search Bash, PowerShell, Python, Ansible, and Terraform scripts
 - **Tabbed script editor** — General, Code, and Variables tabs; viewport-filling CodeMirror editor with unsaved-changes guard
 - **Syntax highlighting** — per-language highlighting with read-only source viewers throughout the app
 - **Script variables** — define typed variables (Text, Number, Array) per script; injected as environment variables at runtime; required-field validation blocks execution until filled
@@ -27,6 +27,7 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 | PowerShell | `powershell.exe` | `pwsh` (PowerShell Core) |
 | Python | `python.exe` | `python3` |
 | Ansible Playbook | — | `ansible-playbook` |
+| Terraform | `terraform.exe` | `terraform` |
 
 ## Roles
 

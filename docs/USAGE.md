@@ -18,7 +18,7 @@ Variables are defined on the **Variables** tab and injected into the script proc
 
 | Type | Description | Accessing in script |
 |---|---|---|
-| **Text** | Any string value | `$VAR` / `$env:VAR` / `os.environ['VAR']` |
+| **Text** | Any string value | `$VAR` / `$env:VAR` / `os.environ['VAR']` / `var.VAR` (Terraform) |
 | **Number** | Numeric value; validated before run | same as Text — arrives as a string |
 | **Array** | Comma-separated list of values | parse with `IFS`, `-split`, or `.split(',')` |
 

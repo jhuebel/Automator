@@ -25,6 +25,13 @@
 
 @if (!Compact)
 {
+    <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Terraform Scripts</MudText>
+    <MudText Typo="Typo.body2" Class="mb-1">
+        Terraform scripts run in two phases — <code>terraform init</code> then <code>terraform apply -auto-approve</code> — both streamed to the output panel.
+        Each run uses a fresh temporary directory; state is ephemeral unless you configure a remote backend in your HCL.
+        Variables are injected as <code>TF_VAR_&lt;name&gt;</code> environment variables and accessed as <code>var.&lt;name&gt;</code> inside your configuration.
+    </MudText>
+
     <MudText Typo="Typo.subtitle2" Class="mt-2 mb-1">Tips</MudText>
     <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem;">
         <li>Every run is automatically saved to <MudLink Href="/history">Execution History</MudLink> regardless of outcome.</li>

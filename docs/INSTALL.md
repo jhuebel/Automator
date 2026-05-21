@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - [.NET 9 SDK](https://dot.net)
-- The scripting runtimes you intend to use (`bash`, `pwsh`, `python3`, `ansible-playbook`)
+- The scripting runtimes you intend to use (`bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`)
 
 ## Install .NET 9 (Linux — no root required)
 
