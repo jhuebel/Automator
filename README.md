@@ -100,8 +100,8 @@ Automator/
 
 ## Documentation
 
-- [INSTALL.md](INSTALL.md) — prerequisites, installation, and database configuration
-- [USAGE.md](USAGE.md) — script editor, variables, runner, scheduler, and cron reference
+- [docs/INSTALL.md](docs/INSTALL.md) — prerequisites, installation, and database configuration
+- [docs/USAGE.md](docs/USAGE.md) — script editor, variables, runner, scheduler, and cron reference
 
 ## License
 
