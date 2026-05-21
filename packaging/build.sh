@@ -31,7 +31,7 @@ dotnet publish src/Automator.Web \
     -r linux-x64 \
     -o "$BUILD_DIR/linux-x64" \
     /p:PublishSingleFile=false \
-    --nologo -q
+    --nologo
 
 # Bundle shared systemd + nginx configs
 cp packaging/linux-common/automator.service    "$BUILD_DIR/linux-x64/"
@@ -60,7 +60,7 @@ dotnet publish src/Automator.Web \
     -r win-x64 \
     -o "$BUILD_DIR/win-x64" \
     /p:PublishSingleFile=false \
-    --nologo -q
+    --nologo
 
 # Bundle install/uninstall scripts
 cp packaging/windows/install.ps1   "$BUILD_DIR/win-x64/"
