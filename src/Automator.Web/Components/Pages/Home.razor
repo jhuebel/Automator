@@ -32,13 +32,16 @@
             </div>
         </CardHeaderContent>
     </MudCardHeader>
-    <MudCardContent Style="padding-top: 0;">
-        <MudChart T="double"
-                  ChartType="ChartType.StackedBar"
-                  ChartSeries="@_chartSeries"
-                  ChartLabels="@_chartLabels"
-                  Width="100%" Height="260px"
-                  ChartOptions="@_chartOptions" />
+    <MudCardContent Style="padding-top: 0; padding-bottom: 60px;">
+        <div style="width: 100%; height: 260px; overflow: visible;">
+            <MudChart T="double"
+                      ChartType="ChartType.StackedBar"
+                      ChartSeries="@_chartSeries"
+                      ChartLabels="@_chartLabels"
+                      Width="100%" Height="100%"
+                      MatchBoundsToSize="true"
+                      ChartOptions="@_chartOptions" />
+        </div>
     </MudCardContent>
 </MudCard>
 
