@@ -57,7 +57,6 @@ To enable it: **Settings → AI Assistant** → paste your API key → choose a 
 - [ASP.NET Core Identity](https://learn.microsoft.com/aspnet/core/security/authentication/identity) — authentication and role-based authorization
 - [Entity Framework Core 9](https://learn.microsoft.com/ef/core) — ORM; SQLite (default) or MySQL/MariaDB
 - [MudBlazor 9](https://mudblazor.com) — component library
-- [Chart.js 4](https://www.chartjs.org) — dashboard execution chart
 - [CodeMirror 5](https://codemirror.net/5/) — syntax-highlighted editor (vendored, no CDN)
 - [Cronos](https://github.com/HangfireIO/Cronos) — cron expression parsing
 - [Anthropic API](https://docs.anthropic.com/en/api/getting-started) — Claude AI assistant (optional)
