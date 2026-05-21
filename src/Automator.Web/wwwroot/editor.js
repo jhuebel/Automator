@@ -6,7 +6,8 @@ window.codeEditor = (function () {
         'Bash':            'shell',
         'PowerShell':      'powershell',
         'Python':          'python',
-        'AnsiblePlaybook': 'yaml'
+        'AnsiblePlaybook': 'yaml',
+        'Terraform':       'hcl'
     };
 
     function _mode(language) {

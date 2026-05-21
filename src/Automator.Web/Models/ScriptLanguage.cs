@@ -7,7 +7,8 @@ public enum ScriptLanguage
     Bash,
     PowerShell,
     Python,
-    Ansible
+    Ansible,
+    Terraform
 }
 
 public static class ScriptLanguageExtensions
@@ -18,6 +19,7 @@ public static class ScriptLanguageExtensions
         ScriptLanguage.PowerShell => "PowerShell",
         ScriptLanguage.Python => "Python",
         ScriptLanguage.Ansible => "Ansible Playbook",
+        ScriptLanguage.Terraform => "Terraform",
         _ => lang.ToString()
     };
 
@@ -27,6 +29,7 @@ public static class ScriptLanguageExtensions
         ScriptLanguage.PowerShell => ".ps1",
         ScriptLanguage.Python => ".py",
         ScriptLanguage.Ansible => ".yml",
+        ScriptLanguage.Terraform => ".tf",
         _ => ".txt"
     };
 
@@ -36,6 +39,7 @@ public static class ScriptLanguageExtensions
         ScriptLanguage.PowerShell => Icons.Material.Filled.Window,
         ScriptLanguage.Python => Icons.Material.Filled.Code,
         ScriptLanguage.Ansible => Icons.Material.Filled.Settings,
+        ScriptLanguage.Terraform => Icons.Material.Filled.ViewInAr,
         _ => Icons.Material.Filled.Code
     };
 
@@ -45,6 +49,7 @@ public static class ScriptLanguageExtensions
         ScriptLanguage.PowerShell => Color.Primary,
         ScriptLanguage.Python => Color.Warning,
         ScriptLanguage.Ansible => Color.Error,
+        ScriptLanguage.Terraform => Color.Secondary,
         _ => Color.Default
     };
 }
