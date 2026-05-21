@@ -23,6 +23,7 @@ public class ScriptDefinition
         Variables   = Variables.Select(v => new ScriptVariable
         {
             Name         = v.Name,
+            Type         = v.Type,
             Description  = v.Description,
             DefaultValue = v.DefaultValue,
             Required     = v.Required

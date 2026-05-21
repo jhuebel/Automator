@@ -24,121 +24,128 @@
                 border-top: 4px solid var(--mud-palette-primary);
                 box-shadow: 0 2px 4px -1px rgba(0,0,0,0.2), 0 4px 5px 0 rgba(0,0,0,0.14), 0 1px 10px 0 rgba(0,0,0,0.12);">
 
-        @* Fields *@
-        <div style="flex-shrink: 0; padding: 16px 16px 0;">
-            <MudGrid Spacing="2">
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_script.Name" Label="Name" Variant="Variant.Outlined"
-                                  Placeholder="Script name" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" Label="Language"
-                               Variant="Variant.Outlined" Margin="Margin.Dense">
-                        @foreach (var lang in Enum.GetValues<ScriptLanguage>())
-                        {
-                            <MudSelectItem T="ScriptLanguage" Value="@lang">@lang.ToDisplayName()</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudTextField @bind-Value="_tagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  Placeholder="e.g. network, diagnostics"
-                                  HelperText="Comma-separated keywords" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_script.Description" Label="Description"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
-                </MudItem>
-            </MudGrid>
-        </div>
-
-        @* Editor *@
-        <div style="flex: 1; min-height: 0; padding: 12px 16px 8px; display: flex; flex-direction: column;">
-            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary); display:block; margin-bottom:4px; flex-shrink:0;">Script Content</MudText>
-            <div style="flex: 1; min-height: 0;">
-                <CodeEditor @ref="_editor" @bind-Value="_script.Content" Language="@_script.Language" Height="100%" />
-            </div>
-        </div>
-
-        @* Variables *@
-        <div style="flex-shrink: 0; padding: 0 16px 8px;">
-            <MudExpansionPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject"
-                               Style="border: 1px solid var(--mud-palette-lines-inputs); border-radius:4px;">
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2" Style="display:block;">
-                    Variables are passed as environment variables at runtime.
-                    Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
-                </MudText>
-                @foreach (var v in _script.Variables)
+        @* General / Code / Variables tabs *@
+        <MudTabs Elevation="0" Class="script-editor-tabs"
+                 @bind-ActivePanelIndex="_activeTab">
+            <MudTabPanel Text="General" Icon="@Icons.Material.Outlined.Info">
+                <div style="padding: 16px; overflow-y: auto; height: 100%;">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_script.Name" Label="Name" Variant="Variant.Outlined"
+                                          Placeholder="Script name" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="ScriptLanguage" @bind-Value="_script.Language" Label="Language"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var lang in Enum.GetValues<ScriptLanguage>())
+                                {
+                                    <MudSelectItem T="ScriptLanguage" Value="@lang">@lang.ToDisplayName()</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudTextField @bind-Value="_tagsText" Label="Tags" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          Placeholder="e.g. network, diagnostics"
+                                          HelperText="Comma-separated keywords" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_script.Description" Label="Description"
+                                          Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Brief description" />
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+            <MudTabPanel Text="Code" Icon="@Icons.Material.Outlined.Code">
+                <div style="flex: 1; min-height: 0; padding: 8px 16px; display: flex; flex-direction: column;">
+                    <div style="flex: 1; min-height: 0;">
+                        <CodeEditor @ref="_editor" @bind-Value="_script.Content" Language="@_script.Language" Height="100%" />
+                    </div>
+                </div>
+                @if (Claude.IsConfigured)
                 {
-                    var variable = v;
-                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
-                        <MudTextField @bind-Value="variable.Name" Label="Name" Variant="Variant.Outlined"
-                                      Margin="Margin.Dense" Style="width: 150px; flex-shrink: 0;"
-                                      Placeholder="VAR_NAME" />
-                        <MudTextField @bind-Value="variable.DefaultValue" Label="Default value" Variant="Variant.Outlined"
-                                      Margin="Margin.Dense" Style="width: 160px; flex-shrink: 0;" />
-                        <MudTextField @bind-Value="variable.Description" Label="Description" Variant="Variant.Outlined"
-                                      Margin="Margin.Dense" Style="flex: 1; min-width: 140px;" />
-                        <MudCheckBox T="bool" @bind-Value="variable.Required" Label="Required" Size="Size.Small"
-                                     Style="flex-shrink: 0; white-space: nowrap;" />
-                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
-                                       title="Remove variable" OnClick="() => _script.Variables.Remove(variable)" />
+                    <div style="flex-shrink: 0; padding: 0 16px 8px;">
+                        <MudExpansionPanel Text="AI Assistant" Icon="@Icons.Material.Filled.AutoAwesome"
+                                           Style="border: 1px solid var(--mud-palette-lines-inputs); border-radius:4px;">
+                            <MudTabs @bind-ActivePanelIndex="_aiMode" Rounded="true" Border="true">
+                                <MudTabPanel Text="Generate" Icon="@Icons.Material.Filled.Add">
+                                    <div class="pa-3">
+                                        <MudTextField @bind-Value="_aiPrompt" Label="Describe what the script should do"
+                                                      Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    </div>
+                                </MudTabPanel>
+                                <MudTabPanel Text="Improve" Icon="@Icons.Material.Filled.Tune">
+                                    <div class="pa-3">
+                                        <MudTextField @bind-Value="_aiPrompt" Label="What should be improved or changed?"
+                                                      Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    </div>
+                                </MudTabPanel>
+                                <MudTabPanel Text="Explain" Icon="@Icons.Material.Filled.HelpOutline">
+                                    <div class="pa-3">
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">Click Explain to get a plain-language description of the current script.</MudText>
+                                    </div>
+                                </MudTabPanel>
+                            </MudTabs>
+                            <div style="display:flex; gap:0.5rem; margin-top:0.75rem; align-items:center;">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_aiRunning"
+                                           StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="RunAi">
+                                    @(_aiMode == 0 ? "Generate" : _aiMode == 1 ? "Improve" : "Explain")
+                                </MudButton>
+                                @if (_aiRunning)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="CancelAi">Cancel</MudButton>
+                                }
+                            </div>
+                            @if (_aiMode == 2 && !string.IsNullOrEmpty(_aiExplanation))
+                            {
+                                <MudPaper Class="mt-3 pa-3" Elevation="0" Style="background:var(--mud-palette-background-grey); border-radius:4px;">
+                                    <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_aiExplanation</MudText>
+                                </MudPaper>
+                            }
+                            @if (!string.IsNullOrEmpty(_aiError))
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_aiError</MudAlert>
+                            }
+                        </MudExpansionPanel>
                     </div>
                 }
-                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
-                           OnClick="AddVariable">Add Variable</MudButton>
-            </MudExpansionPanel>
-        </div>
-
-        @* AI assistant *@
-        @if (Claude.IsConfigured)
-        {
-        <div style="flex-shrink: 0; padding: 0 16px 8px;">
-            <MudExpansionPanel Text="AI Assistant" Icon="@Icons.Material.Filled.AutoAwesome"
-                               Style="border: 1px solid var(--mud-palette-lines-inputs); border-radius:4px;">
-                <MudTabs @bind-ActivePanelIndex="_aiMode" Rounded="true" Border="true">
-                    <MudTabPanel Text="Generate" Icon="@Icons.Material.Filled.Add">
-                        <div class="pa-3">
-                            <MudTextField @bind-Value="_aiPrompt" Label="Describe what the script should do"
-                                          Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                        </div>
-                    </MudTabPanel>
-                    <MudTabPanel Text="Improve" Icon="@Icons.Material.Filled.Tune">
-                        <div class="pa-3">
-                            <MudTextField @bind-Value="_aiPrompt" Label="What should be improved or changed?"
-                                          Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" />
-                        </div>
-                    </MudTabPanel>
-                    <MudTabPanel Text="Explain" Icon="@Icons.Material.Filled.HelpOutline">
-                        <div class="pa-3">
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">Click Explain to get a plain-language description of the current script.</MudText>
-                        </div>
-                    </MudTabPanel>
-                </MudTabs>
-                <div style="display:flex; gap:0.5rem; margin-top:0.75rem; align-items:center;">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_aiRunning"
-                               StartIcon="@Icons.Material.Filled.AutoAwesome" OnClick="RunAi">
-                        @(_aiMode == 0 ? "Generate" : _aiMode == 1 ? "Improve" : "Explain")
-                    </MudButton>
-                    @if (_aiRunning)
+            </MudTabPanel>
+            <MudTabPanel Text="Variables" Icon="@Icons.Material.Filled.DataObject">
+                <div style="padding: 16px; overflow-y: auto; height: 100%;">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3" Style="display:block;">
+                        Variables are passed as environment variables at runtime.
+                        Access them in your script as <code>$NAME</code> (Bash), <code>$env:NAME</code> (PowerShell), or <code>os.environ['NAME']</code> (Python).
+                    </MudText>
+                    @foreach (var v in _script.Variables)
                     {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
-                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="CancelAi">Cancel</MudButton>
+                        var variable = v;
+                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                            <MudTextField @bind-Value="variable.Name" Label="Name" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Style="width: 130px; flex-shrink: 0;"
+                                          Placeholder="VAR_NAME" />
+                            <MudSelect T="ScriptVariableType" @bind-Value="variable.Type" Label="Type"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Style="width: 105px; flex-shrink: 0;">
+                                @foreach (var t in Enum.GetValues<ScriptVariableType>())
+                                {
+                                    <MudSelectItem T="ScriptVariableType" Value="@t">@t</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTextField @bind-Value="variable.DefaultValue" Label="Default" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Style="width: 140px; flex-shrink: 0;"
+                                          Placeholder="@DefaultPlaceholder(variable.Type)" />
+                            <MudTextField @bind-Value="variable.Description" Label="Description" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Style="flex: 1; min-width: 120px;" />
+                            <MudCheckBox T="bool" @bind-Value="variable.Required" Label="Required" Size="Size.Small"
+                                         Style="flex-shrink: 0; white-space: nowrap;" />
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                           title="Remove variable" OnClick="() => _script.Variables.Remove(variable)" />
+                        </div>
                     }
+                    <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                               OnClick="AddVariable">Add Variable</MudButton>
                 </div>
-                @if (_aiMode == 2 && !string.IsNullOrEmpty(_aiExplanation))
-                {
-                    <MudPaper Class="mt-3 pa-3" Elevation="0" Style="background:var(--mud-palette-background-grey); border-radius:4px;">
-                        <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@_aiExplanation</MudText>
-                    </MudPaper>
-                }
-                @if (!string.IsNullOrEmpty(_aiError))
-                {
-                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_aiError</MudAlert>
-                }
-            </MudExpansionPanel>
-        </div>
-        }
+            </MudTabPanel>
+        </MudTabs>
 
         @* Validation error *@
         @if (!string.IsNullOrEmpty(_validationError))
@@ -190,6 +197,7 @@
     private CodeEditor? _editor;
     private string? _pendingNavUrl;
     private IDisposable? _locationChangingReg;
+    private int _activeTab;  // 0=General, 1=Code, 2=Variables
 
     // Snapshot of values at load time — dirty when current state diverges
     private string _origName = string.Empty;
@@ -256,6 +264,13 @@
     }
 
     private void AddVariable() => _script.Variables.Add(new ScriptVariable());
+
+    private static string DefaultPlaceholder(ScriptVariableType type) => type switch
+    {
+        ScriptVariableType.Number => "0",
+        ScriptVariableType.Array  => "a, b, c",
+        _                         => ""
+    };
 
     private async Task TryNavigateBack()
     {

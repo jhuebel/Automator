@@ -76,7 +76,9 @@
                         {
                             <MudTextField @bind-Value="_variableValues[v.Name]"
                                           Label="@(v.Required ? v.Name + " *" : v.Name)"
-                                          HelperText="@v.Description"
+                                          HelperText="@RunnerHelperText(v)"
+                                          Error="@IsInvalidNumber(v)"
+                                          Placeholder="@RunnerPlaceholder(v)"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
                                           Class="mb-2" />
@@ -169,7 +171,40 @@
     private bool CanRun => SelectedScript is not null && !IsRunning &&
         SelectedScript.Variables
             .Where(v => !string.IsNullOrWhiteSpace(v.Name) && v.Required)
-            .All(v => _variableValues.TryGetValue(v.Name, out var val) && !string.IsNullOrWhiteSpace(val));
+            .All(v => _variableValues.TryGetValue(v.Name, out var val) && !string.IsNullOrWhiteSpace(val)) &&
+        SelectedScript.Variables
+            .Where(v => !string.IsNullOrWhiteSpace(v.Name) && v.Type == ScriptVariableType.Number)
+            .All(v => !_variableValues.TryGetValue(v.Name, out var val) || string.IsNullOrWhiteSpace(val) || double.TryParse(val, out _));
+
+    private bool IsInvalidNumber(ScriptVariable v) =>
+        v.Type == ScriptVariableType.Number &&
+        _variableValues.TryGetValue(v.Name, out var val) &&
+        !string.IsNullOrWhiteSpace(val) &&
+        !double.TryParse(val, out _);
+
+    private static string RunnerHelperText(ScriptVariable v)
+    {
+        var typeHint = v.Type switch
+        {
+            ScriptVariableType.Number => "numeric value",
+            ScriptVariableType.Array  => "comma-separated values",
+            _                         => null
+        };
+        return (v.Description, typeHint) switch
+        {
+            ({ Length: > 0 } d, { } t) => $"{d} ({t})",
+            ({ Length: > 0 } d, null)  => d,
+            (_, { } t)                 => t,
+            _                          => string.Empty
+        };
+    }
+
+    private static string RunnerPlaceholder(ScriptVariable v) => v.Type switch
+    {
+        ScriptVariableType.Number => "0",
+        ScriptVariableType.Array  => "value1, value2, value3",
+        _                         => string.Empty
+    };
 
     protected override async Task OnInitializedAsync()
     {
