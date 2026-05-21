@@ -61,6 +61,47 @@ Mark a variable as **Required** to prevent the script from running until a value
 
 Set a default value on the **Variables** tab in the editor. The runner pre-fills the input with this value; the user can override it before each run. Scheduled jobs always use the default values.
 
+## Terraform Scripts
+
+Terraform scripts are written as a single HCL file (`main.tf`). When you run a Terraform script, Automator:
+
+1. Creates a temporary working directory
+2. Writes your script content as `main.tf`
+3. Runs `terraform init`
+4. If init succeeds, runs `terraform apply -auto-approve`
+5. Streams the output of both phases in real time
+6. Deletes the working directory when finished
+
+### Variables
+
+Variables are automatically exposed to Terraform via the `TF_VAR_` prefix convention. A variable named `region` in Automator is available inside your HCL as `var.region` — no manual prefixing required.
+
+```hcl
+variable "region" {}
+
+provider "aws" {
+  region = var.region
+}
+```
+
+### State
+
+The working directory is deleted after every run, so Terraform state is ephemeral. For persistent state, configure a [remote backend](https://developer.hashicorp.com/terraform/language/backend) (such as S3 or Terraform Cloud) inside your HCL:
+
+```hcl
+terraform {
+  backend "s3" {
+    bucket = "my-tf-state"
+    key    = "automator/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+```
+
+### Requirements
+
+`terraform` must be installed and available on the system PATH. Check **Settings → System Status** to verify it is detected.
+
 ## Script Runner
 
 1. Select a script from the list on the left.

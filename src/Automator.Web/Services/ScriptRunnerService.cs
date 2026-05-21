@@ -105,6 +105,9 @@ public class ScriptRunnerService : IScriptRunnerService
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         var execToken = linkedCts.Token;
 
+        if (script.Language == ScriptLanguage.Terraform)
+            return await ExecuteTerraformAsync(script, result, settings, progress, variables, execToken, username);
+
         var tempFile = Path.Combine(Path.GetTempPath(), $"automator_{result.ExecutionId}{script.Language.ToFileExtension()}");
 
         try
@@ -171,6 +174,90 @@ public class ScriptRunnerService : IScriptRunnerService
         return result;
     }
 
+    private async Task<ScriptExecutionResult> ExecuteTerraformAsync(
+        ScriptDefinition script, ScriptExecutionResult result, AppSetting settings,
+        IProgress<OutputLine> progress, Dictionary<string, string>? variables,
+        CancellationToken execToken, string? username)
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"automator_{result.ExecutionId}_tf");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(tempDir, "main.tf"), script.Content, execToken);
+
+            ProcessStartInfo MakePsi(string args)
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "terraform",
+                    Arguments = args,
+                    WorkingDirectory = tempDir,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                if (variables is not null)
+                    foreach (var (key, value) in variables)
+                        if (!string.IsNullOrWhiteSpace(key))
+                            psi.Environment[$"TF_VAR_{key}"] = value;
+                return psi;
+            }
+
+            async Task<int> RunPhaseAsync(string args)
+            {
+                using var process = Process.Start(MakePsi(args))
+                    ?? throw new InvalidOperationException("Failed to start terraform process");
+                var outTask = CaptureStreamAsync(process.StandardOutput, false, result, progress, execToken);
+                var errTask = CaptureStreamAsync(process.StandardError, true, result, progress, execToken);
+                await process.WaitForExitAsync(execToken);
+                await Task.WhenAll(outTask, errTask);
+                return process.ExitCode;
+            }
+
+            ReportLine(new OutputLine { Text = "==> terraform init", IsError = false }, result, progress);
+            var initExit = await RunPhaseAsync("init -no-color");
+            if (initExit != 0)
+            {
+                result.ExitCode = initExit;
+                return result;
+            }
+
+            ReportLine(new OutputLine { Text = "==> terraform apply", IsError = false }, result, progress);
+            result.ExitCode = await RunPhaseAsync("apply -auto-approve -no-color");
+        }
+        catch (OperationCanceledException)
+        {
+            result.ExitCode = -1;
+            var msg = "Execution cancelled by user.";
+            ReportLine(new OutputLine { Text = msg, IsError = true }, result, progress);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing Terraform script {ScriptId}", script.Id);
+            result.ExitCode = -1;
+            ReportLine(new OutputLine { Text = $"Execution error: {ex.Message}", IsError = true }, result, progress);
+        }
+        finally
+        {
+            result.CompletedAt = DateTime.UtcNow;
+            _executionLock.Release();
+
+            var outcome = result.IsSuccess ? $"exit {result.ExitCode}" : $"failed (exit {result.ExitCode})";
+            await _audit.LogAsync("Script.Executed", script.Name, outcome, username);
+
+            using var db = _dbFactory.CreateDbContext();
+            db.ExecutionHistory.Update(result);
+            await db.SaveChangesAsync(CancellationToken.None);
+
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+
+        return result;
+    }
+
     private static void ReportLine(OutputLine line, ScriptExecutionResult result, IProgress<OutputLine> progress)
     {
         result.Output.Add(line);
@@ -202,6 +289,7 @@ public class ScriptRunnerService : IScriptRunnerService
             ScriptLanguage.Python when isWindows => ("python.exe", ""),
             ScriptLanguage.Python => ("python3", ""),
             ScriptLanguage.Ansible => ("ansible-playbook", ""),
+            ScriptLanguage.Terraform => ("terraform", ""),
             _ => throw new NotSupportedException($"Language {language} is not supported")
         };
     }

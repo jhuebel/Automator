@@ -18,6 +18,7 @@ public class DependencyCheckService : IDependencyCheckService
         ("PowerShell Core", "Cross-platform PowerShell (pwsh)", "pwsh",             "--version",  ScriptLanguage.PowerShell),
         ("Python 3",        "Python interpreter",               "python3",          "--version",  ScriptLanguage.Python),
         ("Ansible",         "Ansible automation platform",      "ansible-playbook", "--version",  ScriptLanguage.Ansible),
+        ("Terraform",       "Infrastructure as Code tool",      "terraform",        "version",    ScriptLanguage.Terraform),
     ];
 
     public DependencyCheckService(IDbContextFactory<AutomatorDbContext> dbFactory, IConfiguration config)
