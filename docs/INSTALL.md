@@ -1,6 +1,76 @@
 # Installation
 
-## Prerequisites
+## Pre-built Packages
+
+Download the latest release archive for your platform from the [Releases page](https://github.com/jhuebel/Automator/releases).
+
+### Ubuntu
+
+```bash
+# 1. Extract the archive and run the Ubuntu install script
+tar -xzf automator-<version>-linux-x64.tar.gz -C /tmp/automator-install
+sudo bash /tmp/automator-install/packaging/ubuntu/install.sh
+```
+
+### RHEL / Rocky / AlmaLinux
+
+```bash
+# 1. Extract the archive and run the RHEL install script
+tar -xzf automator-<version>-linux-x64.tar.gz -C /tmp/automator-install
+sudo bash /tmp/automator-install/packaging/rhel/install.sh
+```
+
+> **SELinux note:** The RHEL install script automatically runs `setsebool -P httpd_can_network_connect 1` to allow nginx to proxy to the app. If SELinux is not present the command is skipped.
+
+### Windows Server
+
+Requires IIS with [URL Rewrite 2.1](https://www.iis.net/downloads/microsoft/url-rewrite) and [Application Request Routing 3.0](https://www.iis.net/downloads/microsoft/application-request-routing) for the reverse proxy. Run in an elevated PowerShell session:
+
+```powershell
+Expand-Archive automator-<version>-win-x64.zip -DestinationPath C:\automator-install
+Set-ExecutionPolicy -Scope Process Bypass
+C:\automator-install\install.ps1
+```
+
+Pass `-SkipIis` to install only the Windows Service (app listens on port 5000 directly).
+
+### Installed paths (Linux)
+
+| Path | Contents |
+|---|---|
+| `/opt/automator/app` | Application binary and assets |
+| `/opt/automator/data` | SQLite database (`automator.db`) |
+| `/etc/automator/environment` | Optional secrets/env-var overrides (create manually) |
+| `/etc/systemd/system/automator.service` | Systemd unit |
+| `/etc/nginx/conf.d/automator.conf` | nginx reverse proxy config |
+
+### Installed paths (Windows)
+
+| Path | Contents |
+|---|---|
+| `C:\Program Files\Automator\app` | Application binary and assets |
+| `C:\ProgramData\Automator` | SQLite database |
+
+### Uninstall
+
+```bash
+# Ubuntu
+sudo bash packaging/ubuntu/uninstall.sh
+
+# RHEL
+sudo bash packaging/rhel/uninstall.sh
+```
+
+```powershell
+# Windows (elevated PowerShell)
+C:\automator-install\uninstall.ps1
+```
+
+---
+
+## Build from Source
+
+### Prerequisites
 
 - [.NET 9 SDK](https://dot.net)
 - The scripting runtimes you intend to use (`bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`)
