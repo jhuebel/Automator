@@ -148,6 +148,27 @@ public static class DataSeeder
         },
         new()
         {
+            Name = "Hello World (Terraform)",
+            Description = "Minimal Terraform configuration that prints a greeting via a local output",
+            Language = ScriptLanguage.Terraform,
+            Tags = ["terraform", "demo", "hello-world"],
+            Content = """
+                terraform {
+                  required_version = ">= 1.0"
+                }
+
+                variable "greeting" {
+                  type    = string
+                  default = "Hello, World!"
+                }
+
+                output "message" {
+                  value = var.greeting
+                }
+                """
+        },
+        new()
+        {
             Name = "Disk Space Alert (PowerShell)",
             Description = "Reports drives with less than 20% free space",
             Language = ScriptLanguage.PowerShell,
