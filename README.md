@@ -42,13 +42,16 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 
 The script editor includes a Claude-powered AI assistant that can generate scripts from a description, improve existing scripts, and explain what a script does in plain language. It requires an [Anthropic API key](https://console.anthropic.com/settings/keys) and is completely optional.
 
-To enable it: **Settings → AI Assistant** → paste your API key → choose a model → Save.
+To enable it: **Settings → AI Assistant** → paste your API key → choose a model and effort level → Save.
 
 | Model | Best for |
 |---|---|
 | Haiku 4.5 | Fast iteration, low cost |
-| Sonnet 4.6 | Balanced quality and speed (default) |
-| Opus 4.7 | Complex scripts requiring deep reasoning |
+| Sonnet 5 | Balanced quality and speed (default) |
+| Opus 4.8 | Complex scripts requiring deep reasoning |
+| Fable 5 | Frontier reasoning for the hardest tasks (premium) |
+
+**Effort** (Low / Medium / High / Max) controls how much the model reasons before responding, trading quality against latency and token cost. Defaults to High and is not available for Haiku, which doesn't support the parameter.
 
 ## Tech Stack
 
