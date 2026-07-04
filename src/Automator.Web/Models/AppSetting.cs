@@ -7,5 +7,6 @@ public class AppSetting
     public int MaxConcurrentExecutions { get; set; } = 5;
     public int MaxHistoryRecords { get; set; } = 1000;
     public string? AnthropicApiKey { get; set; }
-    public string AnthropicModel { get; set; } = "claude-sonnet-4-6";
+    public string AnthropicModel { get; set; } = "claude-sonnet-5";
+    public string AnthropicEffort { get; set; } = "high";
 }

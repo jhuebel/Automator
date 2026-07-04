@@ -114,7 +114,10 @@ using (var scope = app.Services.CreateScope())
             db.Database.ExecuteSqlRaw("ALTER TABLE Settings ADD COLUMN AnthropicApiKey TEXT NULL");
         if (!settingsCols.Contains("AnthropicModel"))
             db.Database.ExecuteSqlRaw(
-                "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+                "ALTER TABLE Settings ADD COLUMN AnthropicModel TEXT NOT NULL DEFAULT 'claude-sonnet-5'");
+        if (!settingsCols.Contains("AnthropicEffort"))
+            db.Database.ExecuteSqlRaw(
+                "ALTER TABLE Settings ADD COLUMN AnthropicEffort TEXT NOT NULL DEFAULT 'high'");
 
         var scriptCols = db.Database
             .SqlQueryRaw<string>("SELECT name FROM pragma_table_info('Scripts')")
@@ -133,7 +136,10 @@ using (var scope = app.Services.CreateScope())
             db.Database.ExecuteSqlRaw("ALTER TABLE `Settings` ADD COLUMN `AnthropicApiKey` TEXT NULL");
         if (!settingsCols.Any(c => c.Equals("AnthropicModel", StringComparison.OrdinalIgnoreCase)))
             db.Database.ExecuteSqlRaw(
-                "ALTER TABLE `Settings` ADD COLUMN `AnthropicModel` TEXT NOT NULL DEFAULT 'claude-sonnet-4-6'");
+                "ALTER TABLE `Settings` ADD COLUMN `AnthropicModel` TEXT NOT NULL DEFAULT 'claude-sonnet-5'");
+        if (!settingsCols.Any(c => c.Equals("AnthropicEffort", StringComparison.OrdinalIgnoreCase)))
+            db.Database.ExecuteSqlRaw(
+                "ALTER TABLE `Settings` ADD COLUMN `AnthropicEffort` TEXT NOT NULL DEFAULT 'high'");
 
         var scriptCols = db.Database
             .SqlQueryRaw<string>(
@@ -187,6 +193,18 @@ using (var scope = app.Services.CreateScope())
     {
         db.Settings.Add(new AppSetting());
         db.SaveChanges();
+    }
+    else
+    {
+        // Retired model strings from earlier releases aren't in the current model
+        // picker; roll existing installs forward to the current default.
+        var retiredModels = new[] { "claude-sonnet-4-6", "claude-opus-4-7", "claude-sonnet-4-5", "claude-opus-4-6" };
+        var existingSettings = db.Settings.Find(1);
+        if (existingSettings is not null && retiredModels.Contains(existingSettings.AnthropicModel))
+        {
+            existingSettings.AnthropicModel = "claude-sonnet-5";
+            db.SaveChanges();
+        }
     }
 
     // Seed example scripts and jobs if empty

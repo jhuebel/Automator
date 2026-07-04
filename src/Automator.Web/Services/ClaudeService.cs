@@ -12,6 +12,10 @@ public class ClaudeService : IClaudeService
     private readonly HttpClient _http;
     private readonly string? _apiKey;
     private readonly string _model;
+    private readonly string _effort;
+
+    // Haiku models reject the effort parameter outright.
+    private static bool SupportsEffort(string model) => !model.Contains("haiku", StringComparison.OrdinalIgnoreCase);
 
     public ClaudeService(IDbContextFactory<AutomatorDbContext> dbFactory, HttpClient http)
     {
@@ -20,7 +24,8 @@ public class ClaudeService : IClaudeService
         using var db = dbFactory.CreateDbContext();
         var settings = db.Settings.Find(1);
         _apiKey = settings?.AnthropicApiKey;
-        _model  = settings?.AnthropicModel ?? "claude-sonnet-4-6";
+        _model  = settings?.AnthropicModel ?? "claude-sonnet-5";
+        _effort = settings?.AnthropicEffort ?? "high";
     }
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
@@ -32,14 +37,18 @@ public class ClaudeService : IClaudeService
         if (!IsConfigured)
             throw new InvalidOperationException("Anthropic API key is not configured.");
 
-        var body = JsonSerializer.Serialize(new
+        var payload = new Dictionary<string, object?>
         {
-            model      = _model,
-            max_tokens = 4096,
-            stream     = true,
-            system,
-            messages   = new[] { new { role = "user", content = user } }
-        });
+            ["model"]      = _model,
+            ["max_tokens"] = 4096,
+            ["stream"]     = true,
+            ["system"]     = system,
+            ["messages"]   = new[] { new { role = "user", content = user } }
+        };
+        if (SupportsEffort(_model))
+            payload["output_config"] = new { effort = _effort };
+
+        var body = JsonSerializer.Serialize(payload);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages");
         request.Headers.Add("x-api-key", _apiKey);
