@@ -105,6 +105,9 @@ Automator/
 
 - [docs/INSTALL.md](docs/INSTALL.md) — pre-built packages, build from source, and configuration reference
 - [docs/USAGE.md](docs/USAGE.md) — script editor, variables, runner, scheduler, and cron reference
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — management plane vs. runner split, request/execution flow, component map
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — full database schema reference
+- [docs/RUNNER_PROTOCOL.md](docs/RUNNER_PROTOCOL.md) — runner enrollment, REST, and WebSocket protocol reference
 
 ## License
 

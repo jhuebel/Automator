@@ -1,0 +1,153 @@
+# Data Model
+
+All application tables use ULID primary keys (`HasUlids`) except the framework's own
+`users`, `personal_access_tokens`, and permission tables, which use auto-increment IDs.
+SQLite is the default connection; MySQL/MariaDB works unchanged (see
+[INSTALL.md](INSTALL.md#database)).
+
+## Entity relationship overview
+
+```
+User ──< ScriptExecutionResult (username, free text — not a FK)
+User ──roles/permissions (spatie/laravel-permission)
+
+ScriptDefinition ──< ScriptExecutionResult (script_id, nullOnDelete)
+ScriptDefinition ──< ScheduledJob (script_id, cascadeOnDelete)
+
+Runner ──< ScriptExecutionResult (runner_id)
+Runner ──1 personal_access_tokens (via Sanctum HasApiTokens)
+
+RunnerEnrollmentToken (standalone; consumed once by RunnerController::register())
+
+ScheduledJob ──1 ScriptExecutionResult (current_execution_id, the in-flight run if any)
+
+AppSetting (singleton row — AppSetting::current() firstOrCreate([]))
+AuditLog (standalone append-only log)
+```
+
+## Tables
+
+### `script_definitions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `name` | string | |
+| `description` | text, nullable | |
+| `language` | string | backed by `App\Enums\ScriptLanguage` (`Bash`, `PowerShell`, `Python`, `Ansible`, `Terraform`) |
+| `content` | longtext | script body; a single HCL file for Terraform |
+| `tags` | json | free-form labels, filterable in the Script Library |
+| `variables` | json | list of `{name, type, default_value, required}`; `type` ∈ `App\Enums\ScriptVariableType` (Text/Number/Boolean/List) |
+
+### `script_execution_results`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `script_id` | ulid, FK → `script_definitions`, nullable, `nullOnDelete` | |
+| `runner_id` | ulid, FK → `runners`, nullable, `nullOnDelete` | which runner executed (or is executing) this |
+| `script_name` | string | denormalized snapshot — survives script deletion/rename |
+| `language` | string | denormalized snapshot |
+| `username` | string, nullable | who triggered it (null for scheduled runs) |
+| `started_at` | timestamp | |
+| `completed_at` | timestamp, nullable | null while running |
+| `exit_code` | integer, nullable | `-1` is used for infrastructure failures (no runner available, runner disconnected, timeout) as well as genuine non-zero process exits |
+| `output` | json | ordered list of `{text, is_error, timestamp}` |
+| `pid` | integer, nullable | vestigial — no longer populated now that execution is remote; kept for backward-compatible reads of historical rows |
+| `cancel_requested_at` | timestamp, nullable | set by `RunnerAssignmentService::requestCancel()`; the runner clears nothing here, it just races to call `.../finish` |
+
+Model accessors: `isRunning` (`completed_at === null`), `isSuccess` (`exit_code === 0`),
+`durationSeconds` (null while running).
+
+### `scheduled_jobs`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `name` | string | |
+| `script_id` | ulid, FK → `script_definitions`, `cascadeOnDelete` | |
+| `cron_expression` | string | standard 5-field cron, evaluated in UTC (`dragonmantank/cron-expression`) |
+| `is_enabled` | boolean | |
+| `required_runner_tags` | json, nullable | superset-match against a runner's `tags`; null/empty = any online runner with capacity |
+| `last_run_at` / `next_run_at` | timestamp, nullable | `next_run_at` indexed — `DispatchDueJobs` queries on it |
+| `last_exit_code` | integer, nullable | |
+| `current_execution_id` | ulid, nullable | the in-flight execution, if any; used to skip overlapping runs and to reconcile completion on the next scheduler tick |
+
+### `runners`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `name` | string, unique | operator-chosen at `register` time |
+| `hostname` | string, nullable | reported by the runner (`os.Hostname()`) |
+| `os` | string, nullable | `linux` or `windows` (`runtime.GOOS`) |
+| `tags` | json | capability labels for routing (e.g. `["linux", "terraform"]`) |
+| `runtimes` | json | last-heartbeat snapshot of `[{name, description, available, version, path, error}]` — see `runner/runtimes.go` |
+| `status` | string | `online` / `offline` (heartbeat-driven) / `disabled` (manually toggled from Settings → Runners, excluded from assignment same as offline but distinguished for operator intent); deleting the runner and its token is how an admin permanently revokes one |
+| `last_seen_at` | timestamp, nullable | bumped by `Runner::markSeen()` on every heartbeat *and* every other authenticated runner API call |
+| `current_job_count` | unsigned int, default 0 | incremented on assignment, decremented on `.../finish` |
+| `max_concurrent_jobs` | unsigned int, default 1 | per-runner capacity ceiling; always the DB default today — neither the `register` CLI command nor the Settings UI exposes a way to set it, so raising it currently requires a direct DB update |
+| `personal_access_token_id` | FK → `personal_access_tokens`, nullable, `nullOnDelete` | lets the Settings UI look up/revoke the runner's Sanctum token |
+
+`Runner` uses Sanctum's `HasApiTokens` trait directly (a non-`User` model), so a runner
+authenticates as its own Sanctum-guarded principal — see
+[RUNNER_PROTOCOL.md](RUNNER_PROTOCOL.md#authentication).
+
+### `runner_enrollment_tokens`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `token_hash` | string, unique | SHA-256 of the one-time plaintext token; the plaintext itself is never stored, only shown once at generation time |
+| `expires_at` | timestamp | default TTL 60 minutes (`RunnerEnrollmentToken::issue()`) |
+| `used_at` | timestamp, nullable | enforces single-use — `redeem()` requires `whereNull('used_at')` |
+| `created_by` | FK → `users`, nullable, `nullOnDelete` | null when issued via `php artisan automator:generate-runner-token` (unattended install) rather than the Settings UI |
+
+### `app_settings`
+
+Singleton table — `AppSetting::current()` calls `firstOrCreate([])`, so there is always
+exactly one row (id `1`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `execution_timeout_seconds` | integer, default 300 | passed to the runner in `JobAssigned`; enforced runner-side via `context.WithTimeout` |
+| `max_history_records` | integer, default 1000 | (retention — see History page) |
+| `anthropic_api_key` | text, nullable, `encrypted` cast | write-only from the UI's perspective |
+| `anthropic_model` | string, default `claude-sonnet-5` | |
+| `anthropic_effort` | string, default `high` | ignored for Haiku models, which reject the parameter |
+
+`max_concurrent_executions` existed here through v2.0.0 and was removed in v2.1.0 (see
+`2026_07_07_190000_drop_max_concurrent_executions_from_app_settings_table.php`) —
+concurrency is now per-runner (`runners.max_concurrent_jobs`).
+
+### `audit_logs`
+
+Append-only; no `updated_at` (`const UPDATED_AT = null`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `username` | string, nullable | defaults to the current authenticated user via `AuditLog::record()` |
+| `action` | string | dot-namespaced, e.g. `Script.Executed`, `Settings.Updated` |
+| `resource` | string, nullable | the thing acted on, e.g. a script name |
+| `details` | text, nullable | free-form context, e.g. `"exit 0"` / `"failed (exit 1)"` |
+| `created_at` | timestamp | |
+
+### Auth & permissions
+
+`users` (framework default, `HasUlids` not applied — auto-increment PK) plus
+`spatie/laravel-permission`'s standard `roles`/`permissions`/`model_has_roles`/
+`model_has_permissions`/`role_has_permissions` tables. Seeded roles and their
+permissions (`database/seeders/RoleSeeder.php`):
+
+| Role | Permissions |
+|---|---|
+| **Admin** | everything below, plus `settings.manage`, `users.manage`, `audit.view` |
+| **Developer** | `scripts.view/run/edit/delete`, `jobs.view/manage` |
+| **Operator** | `scripts.view/run`, `jobs.view` |
+| **Viewer** | `scripts.view`, `jobs.view` |
+
+`personal_access_tokens` (Sanctum's standard table) is shared between any future
+first-party API tokens and runner tokens — a runner's token is distinguished by its
+owning model being `Runner`, not `User`, and by the `runner` ability string passed to
+`createToken('runner', ['runner'])`.
