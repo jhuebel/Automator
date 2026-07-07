@@ -126,8 +126,10 @@ func (c *apiClient) authorizeChannel(channelName, socketID string) (string, erro
 	return out.Auth, nil
 }
 
-func (c *apiClient) heartbeat() error {
-	_, status, err := c.post("/api/runner/heartbeat", nil)
+func (c *apiClient) heartbeat(runtimes []RuntimeCheck) error {
+	_, status, err := c.post("/api/runner/heartbeat", map[string]any{
+		"runtimes": runtimes,
+	})
 	if err != nil {
 		return err
 	}

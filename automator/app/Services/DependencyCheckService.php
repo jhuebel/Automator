@@ -2,74 +2,31 @@
 
 namespace App\Services;
 
-use App\Enums\ScriptLanguage;
+use App\Models\Runner;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\Process\Exception\ProcessTimedOutException;
-use Symfony\Component\Process\Process;
 
 class DependencyCheckService
 {
     /**
-     * @return array{name: string, description: string, language: ?ScriptLanguage, command: string, version_args: string}[]
+     * Script runtime availability per registered runner, as last reported in
+     * that runner's heartbeat. The Laravel management plane never executes
+     * scripts itself, so its own PATH is irrelevant here — only runner hosts
+     * matter.
+     *
+     * @return array{id: string, name: string, status: string, os: ?string, last_seen_at: ?string, runtimes: array}[]
      */
-    private const RUNTIME_CHECKS = [
-        ['name' => 'Bash', 'description' => 'Bourne Again Shell', 'command' => 'bash', 'version_args' => '--version', 'language' => ScriptLanguage::Bash],
-        ['name' => 'PowerShell Core', 'description' => 'Cross-platform PowerShell (pwsh)', 'command' => 'pwsh', 'version_args' => '--version', 'language' => ScriptLanguage::PowerShell],
-        ['name' => 'Python 3', 'description' => 'Python interpreter', 'command' => 'python3', 'version_args' => '--version', 'language' => ScriptLanguage::Python],
-        ['name' => 'Ansible', 'description' => 'Ansible automation platform', 'command' => 'ansible-playbook', 'version_args' => '--version', 'language' => ScriptLanguage::Ansible],
-        ['name' => 'Terraform', 'description' => 'Infrastructure as Code tool', 'command' => 'terraform', 'version_args' => 'version', 'language' => ScriptLanguage::Terraform],
-    ];
-
-    /**
-     * @return array{name: string, description: string, available: bool, version: ?string, path: ?string, error: ?string, language: ScriptLanguage}[]
-     */
-    public function checkRuntimes(): array
+    public function runnerRuntimes(): array
     {
-        return array_map(
-            fn (array $check) => $this->checkRuntime(...$check),
-            self::RUNTIME_CHECKS,
-        );
-    }
-
-    private function checkRuntime(string $name, string $description, string $command, string $version_args, ScriptLanguage $language): array
-    {
-        try {
-            $path = $this->resolvePath($command);
-
-            $process = new Process([$command, ...explode(' ', $version_args)]);
-            $process->setTimeout(5);
-            $process->run();
-
-            $output = $process->getOutput().$process->getErrorOutput();
-            $version = collect(preg_split('/\r?\n/', trim($output)))->first();
-
-            return [
-                'name' => $name,
-                'description' => $description,
-                'available' => $process->isSuccessful() || $path !== null,
-                'version' => $version ?: null,
-                'path' => $path,
-                'error' => null,
-                'language' => $language,
-            ];
-        } catch (ProcessTimedOutException) {
-            return ['name' => $name, 'description' => $description, 'available' => false, 'version' => null, 'path' => null, 'error' => 'Timed out after 5s', 'language' => $language];
-        } catch (\Throwable $e) {
-            return ['name' => $name, 'description' => $description, 'available' => false, 'version' => null, 'path' => null, 'error' => 'Not found in PATH', 'language' => $language];
-        }
-    }
-
-    private function resolvePath(string $command): ?string
-    {
-        try {
-            $process = new Process(['which', $command]);
-            $process->setTimeout(5);
-            $process->run();
-
-            return $process->isSuccessful() ? trim($process->getOutput()) ?: null : null;
-        } catch (\Throwable) {
-            return null;
-        }
+        return Runner::orderBy('name')->get()
+            ->map(fn (Runner $runner) => [
+                'id' => $runner->id,
+                'name' => $runner->name,
+                'status' => $runner->status,
+                'os' => $runner->os,
+                'last_seen_at' => $runner->last_seen_at?->toIso8601String(),
+                'runtimes' => $runner->runtimes ?? [],
+            ])
+            ->all();
     }
 
     /**

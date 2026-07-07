@@ -32,12 +32,22 @@ func runDaemon(args []string) {
 	client.runWithReconnect()
 }
 
+// heartbeatLoop reports liveness every 15s. Runtime availability is detected
+// once at startup rather than on every tick — the installed toolchain on a
+// runner host doesn't change minute to minute, and shelling out to five
+// version checks every 15s would be wasteful.
 func heartbeatLoop(api *apiClient) {
+	runtimes := detectRuntimes()
+
+	if err := api.heartbeat(runtimes); err != nil {
+		log.Printf("heartbeat failed: %v", err)
+	}
+
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if err := api.heartbeat(); err != nil {
+		if err := api.heartbeat(runtimes); err != nil {
 			log.Printf("heartbeat failed: %v", err)
 		}
 	}
