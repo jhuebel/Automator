@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Automator runner liveness sweep every 30 seconds
+
+[Timer]
+OnCalendar=*-*-* *:*:00/30
+AccuracySec=1sec
+Persistent=true
+
+[Install]
+WantedBy=timers.target

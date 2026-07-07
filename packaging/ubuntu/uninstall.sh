@@ -9,7 +9,6 @@ set -euo pipefail
 PHP_VERSION="8.3"
 PHP_FPM_POOL="/etc/php/${PHP_VERSION}/fpm/pool.d/automator.conf"
 NGINX_CONF="/etc/nginx/conf.d/automator.conf"
-WORKER_COUNT=5
 
 info() { echo "[INFO]  $*"; }
 die()  { echo "[ERROR] $*" >&2; exit 1; }
@@ -18,13 +17,14 @@ die()  { echo "[ERROR] $*" >&2; exit 1; }
 
 # --- stop and remove systemd units -------------------------------------------
 info "Stopping and disabling services..."
-for i in $(seq 1 "$WORKER_COUNT"); do
-    systemctl disable --now "automator-worker@$i" 2>/dev/null || true
-done
+systemctl disable --now automator-runner 2>/dev/null || true
+systemctl disable --now automator-runner-sweep.timer 2>/dev/null || true
 systemctl disable --now automator-reverb 2>/dev/null || true
 systemctl disable --now automator-scheduler.timer 2>/dev/null || true
 
-rm -f /etc/systemd/system/automator-worker@.service
+rm -f /etc/systemd/system/automator-runner.service
+rm -f /etc/systemd/system/automator-runner-sweep.service
+rm -f /etc/systemd/system/automator-runner-sweep.timer
 rm -f /etc/systemd/system/automator-reverb.service
 rm -f /etc/systemd/system/automator-scheduler.service
 rm -f /etc/systemd/system/automator-scheduler.timer
@@ -44,16 +44,22 @@ if [[ -f "$NGINX_CONF" ]]; then
     systemctl restart nginx 2>/dev/null || true
 fi
 
-# --- remove application files -----------------------------------------------
+# --- remove application and runner files -------------------------------------
 info "Removing application files..."
 rm -rf /opt/automator
+rm -rf /opt/automator-runner
+rm -rf /etc/automator-runner
 
-# --- optionally remove system user ------------------------------------------
-read -r -p "Remove the 'automator' system user? [y/N] " REPLY
+# --- optionally remove system users -----------------------------------------
+read -r -p "Remove the 'automator' and 'automator-runner' system users? [y/N] " REPLY
 if [[ "${REPLY,,}" == "y" ]]; then
     if id automator &>/dev/null; then
         userdel automator
         info "User 'automator' removed."
+    fi
+    if id automator-runner &>/dev/null; then
+        userdel automator-runner
+        info "User 'automator-runner' removed."
     fi
 fi
 

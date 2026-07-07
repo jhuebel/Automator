@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\RunScriptJob;
 use App\Models\ScheduledJob;
 use App\Models\ScriptExecutionResult;
+use App\Services\RunnerAssignmentService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -13,6 +13,11 @@ use Illuminate\Console\Command;
 #[Description('Dispatch scheduled jobs whose next run time is due, and record completions of in-flight runs')]
 class DispatchDueJobs extends Command
 {
+    public function __construct(private RunnerAssignmentService $assignment)
+    {
+        parent::__construct();
+    }
+
     public function handle(): void
     {
         // Must run before the due-jobs query below: it advances next_run_at for any
@@ -41,11 +46,6 @@ class DispatchDueJobs extends Command
                 continue;
             }
 
-            $defaults = collect($script->variables)
-                ->filter(fn ($v) => filled($v['name'] ?? null))
-                ->mapWithKeys(fn ($v) => [$v['name'] => $v['default_value'] ?? ''])
-                ->all();
-
             $result = ScriptExecutionResult::create([
                 'script_id' => $script->id,
                 'script_name' => $script->name,
@@ -54,7 +54,7 @@ class DispatchDueJobs extends Command
                 'output' => [],
             ]);
 
-            RunScriptJob::dispatch($result->id, $defaults);
+            $this->assignment->assign($result, $job->required_runner_tags);
 
             $job->update(['current_execution_id' => $result->id]);
 

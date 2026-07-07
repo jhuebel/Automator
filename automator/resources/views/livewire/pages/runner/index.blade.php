@@ -1,8 +1,8 @@
 <?php
 
-use App\Jobs\RunScriptJob;
 use App\Models\ScriptDefinition;
 use App\Models\ScriptExecutionResult;
+use App\Services\RunnerAssignmentService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -87,10 +87,7 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
             'output' => [],
         ]);
 
-        // Small delay so the browser's Echo subscription (started once this response
-        // reaches the client) is in place before the job's first output line broadcasts —
-        // Reverb doesn't replay history to late subscribers.
-        RunScriptJob::dispatch($result->id, $this->variableValues)->delay(now()->addMilliseconds(600));
+        app(RunnerAssignmentService::class)->assign($result);
 
         $this->executionId = $result->id;
         $this->exitCode = null;
@@ -112,8 +109,8 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
         }
 
         $result = ScriptExecutionResult::find($this->executionId);
-        if ($result?->pid && function_exists('posix_kill')) {
-            posix_kill($result->pid, SIGTERM);
+        if ($result) {
+            app(RunnerAssignmentService::class)->requestCancel($result);
         }
     }
 }; ?>

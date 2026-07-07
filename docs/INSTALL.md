@@ -1,37 +1,47 @@
 # Installation
 
-Automator is a Laravel application. It requires PHP, a queue worker, Laravel Reverb
-(WebSocket broadcasting), a scheduler tick, and a web server in front of PHP-FPM.
+Automator's management plane is a Laravel application (PHP, Laravel Reverb for
+WebSocket broadcasting, a scheduler tick, and a web server in front of PHP-FPM). Script
+execution itself is never done by the management plane — every execution runs on a
+**runner**, a small Go agent that registers with the management plane and executes
+scripts locally on whatever host it's installed on. Runners can run on Linux or Windows,
+and you can register as many as you like (see [Runners](#runners) below). A fresh
+single-box install registers one local runner automatically so a single machine still
+works out of the box.
 
 ## Pre-built Packages
 
 Download the latest release archive from the [Releases page](https://github.com/jhuebel/Automator/releases).
-The archive ships a pre-built app (`vendor/` installed, frontend assets compiled), so the
-target box only needs PHP, nginx, and Composer — not Node.
+The archive ships a pre-built app (`vendor/` installed, frontend assets compiled) plus
+pre-built `automator-runner` binaries for Linux and Windows, so the target box only needs
+PHP, nginx, and Composer — not Node or Go.
 
 ### Ubuntu
 
 ```bash
-mkdir automator && tar -xzf automator-<version>-linux-x64.tar.gz -C automator
-cd automator
+mkdir automator-release && tar -xzf automator-<version>-linux-x64.tar.gz -C automator-release
+cd automator-release
 sudo bash packaging/ubuntu/install.sh
 ```
 
 The install script:
 - Installs `nginx`, PHP 8.3 (`fpm`, `cli`, `sqlite3`, `mbstring`, `xml`, `curl`, `bcmath`) via `apt-get`
-- Creates an `automator` system user
+- Creates `automator` and `automator-runner` system users
 - Copies the app to `/opt/automator/app` and the SQLite database to `/opt/automator/data`
 - Generates a production `.env` (app key, Reverb credentials, SQLite path)
 - Runs migrations (and seeds default roles/users/example scripts on first install only)
 - Configures a dedicated php-fpm pool
-- Installs systemd units for the queue workers, Reverb, and the scheduler timer
+- Installs systemd units for Reverb, the scheduler timer, and the runner offline sweep
 - Writes an nginx reverse proxy config to `/etc/nginx/conf.d/automator.conf`
+- Installs the Linux runner binary to `/opt/automator-runner`, generates a one-time
+  enrollment token, registers a local runner (tagged `linux`) against `http://127.0.0.1`,
+  and starts the `automator-runner` service
 
 ### RHEL / Rocky / AlmaLinux
 
 ```bash
-mkdir automator && tar -xzf automator-<version>-linux-x64.tar.gz -C automator
-cd automator
+mkdir automator-release && tar -xzf automator-<version>-linux-x64.tar.gz -C automator-release
+cd automator-release
 sudo bash packaging/rhel/install.sh
 ```
 
@@ -45,7 +55,10 @@ SELinux, and opens the HTTP port via `firewall-cmd` if firewalld is active.
 | `/opt/automator/app` | Application code, `vendor/`, compiled frontend assets |
 | `/opt/automator/data` | SQLite database (`database.sqlite`) |
 | `/opt/automator/app/.env` | App key, database, queue, and Reverb configuration |
-| `/etc/systemd/system/automator-worker@.service` | Queue worker template (instances `1`–`5`) |
+| `/opt/automator-runner` | Local runner binary |
+| `/etc/automator-runner/config.json` | Local runner's registration (server URL, bearer token, runner id) |
+| `/etc/systemd/system/automator-runner.service` | Local runner daemon |
+| `/etc/systemd/system/automator-runner-sweep.{service,timer}` | Offline-runner sweep, fired every 30s |
 | `/etc/systemd/system/automator-reverb.service` | Reverb WebSocket broadcasting server |
 | `/etc/systemd/system/automator-scheduler.{service,timer}` | Scheduler tick, fired every minute |
 | `/etc/php/8.3/fpm/pool.d/automator.conf` (Ubuntu) or `/etc/php-fpm.d/automator.conf` (RHEL) | Dedicated php-fpm pool |
@@ -54,8 +67,8 @@ SELinux, and opens the HTTP port via `firewall-cmd` if firewalld is active.
 ### Uninstall
 
 ```bash
-mkdir automator && tar -xzf automator-<version>-linux-x64.tar.gz -C automator
-cd automator
+mkdir automator-release && tar -xzf automator-<version>-linux-x64.tar.gz -C automator-release
+cd automator-release
 sudo bash packaging/ubuntu/uninstall.sh   # or packaging/rhel/uninstall.sh
 ```
 
@@ -83,8 +96,12 @@ php artisan migrate --seed
 composer run dev
 ```
 
-`composer run dev` runs the app server, queue worker, Reverb, the scheduler, and the Vite
-dev server together. Open **http://localhost:8000** in your browser.
+`composer run dev` runs the app server, the queue listener (for AI assistant streaming),
+Reverb, the scheduler, the runner-offline sweep, and the Vite dev server together. Open
+**http://localhost:8000** in your browser, then register at least one runner (Settings →
+Runners → Generate Token, then `go run ./runner register ...` from the `runner/`
+directory, or a pre-built `automator-runner` binary) — the app has no local execution
+path, so scripts won't run until a runner is registered and online.
 
 ### Build a Release Archive
 
@@ -146,16 +163,30 @@ DB_PASSWORD=secret
 
 Run `php artisan migrate --force` after changing the connection.
 
-### Queue / Execution Concurrency
+### Runners
 
-Script executions run as queued jobs on the `executions` queue. The number of running
-`automator-worker@N` systemd instances is the concurrency ceiling — matching the
-"Max Concurrent Executions" value in Settings requires enabling/disabling worker instances:
+Every script execution runs on a registered runner — there is no local execution
+fallback, even on a single-box install (the install script registers one runner on the
+same host automatically). Concurrency is per-runner (`max_concurrent_jobs`, set when
+registering) rather than a single global setting.
 
-```bash
-sudo systemctl enable --now automator-worker@6   # raise from 5 to 6 workers
-sudo systemctl disable --now automator-worker@6  # lower back down
-```
+Register additional runners from **Settings → Runners**:
+1. Click **Generate Token** to get a one-time enrollment token (expires in 1 hour).
+2. On the target host (Linux or Windows), install the `automator-runner` binary from the
+   release archive's `runner/linux/` or `runner/windows/` directory, then run:
+   ```bash
+   automator-runner register --server https://your-automator-host \
+     --token <enrollment-token> --name my-runner --tags linux,terraform
+   automator-runner run   # or install as a service — see packaging/runner/
+   ```
+3. The new runner appears in Settings → Runners once it connects. Assign
+   `required_runner_tags` on a scheduled job (or on an ad-hoc run) to route work to
+   runners with matching tags; otherwise any online runner with spare capacity is
+   eligible, chosen least-busy-first.
+
+A runner is marked offline (and any in-flight execution failed) if it misses 3
+consecutive heartbeats (~45s by default). See `packaging/runner/linux/` (systemd) and
+`packaging/runner/windows/` (NSSM-based) for per-runner service installers.
 
 ### Reverb (live output streaming)
 
@@ -177,17 +208,20 @@ Use this section if you built from source and want to deploy without the pre-bui
 packaging scripts. See `packaging/linux-common/` for the exact unit files and nginx config
 referenced below.
 
-1. Install PHP 8.3+, Composer, nginx, and the script runtimes you need.
+1. Install PHP 8.3+, Composer, nginx (the script runtimes — `bash`, `pwsh`, `python3`,
+   `ansible-playbook`, `terraform` — only need to be present on runner hosts, not here).
 2. Copy the app to `/opt/automator/app`, run `composer install --no-dev --optimize-autoloader`.
 3. Configure `.env` (database, `QUEUE_CONNECTION=database`, `BROADCAST_CONNECTION=reverb`, Reverb credentials).
 4. `php artisan key:generate --force && php artisan migrate --force && php artisan db:seed --force`
 5. Configure a php-fpm pool running as a dedicated `automator` user.
 6. Install and enable the systemd units from `packaging/linux-common/`:
-   - `automator-worker@.service` (enable N instances for your desired concurrency)
    - `automator-reverb.service`
    - `automator-scheduler.timer` (+ its paired `.service`)
+   - `automator-runner-sweep.timer` (+ its paired `.service`) — flips stale runners offline
 7. Install `packaging/linux-common/nginx-automator.conf` to your nginx `conf.d/`, adjusting
    the php-fpm socket path if needed, then `nginx -t && systemctl restart nginx`.
+8. Register at least one runner — see [Runners](#runners) above. `packaging/runner/linux/`
+   and `packaging/runner/windows/` have per-OS binary + service installers.
 
 On RHEL / Rocky / AlmaLinux, also run:
 

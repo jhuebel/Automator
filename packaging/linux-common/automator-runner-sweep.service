@@ -1,0 +1,9 @@
+[Unit]
+Description=Automator runner liveness sweep (marks stale runners offline, fails orphaned executions)
+
+[Service]
+Type=oneshot
+User=automator
+Group=automator
+WorkingDirectory=/opt/automator/app
+ExecStart=/usr/bin/php /opt/automator/app/artisan automator:sweep-offline-runners

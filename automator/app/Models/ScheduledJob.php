@@ -13,7 +13,7 @@ class ScheduledJob extends Model
     use HasUlids;
 
     protected $fillable = [
-        'name', 'script_id', 'cron_expression', 'is_enabled',
+        'name', 'script_id', 'cron_expression', 'is_enabled', 'required_runner_tags',
         'last_run_at', 'next_run_at', 'last_exit_code', 'current_execution_id',
     ];
 
@@ -23,6 +23,7 @@ class ScheduledJob extends Model
             'is_enabled' => 'boolean',
             'last_run_at' => 'datetime',
             'next_run_at' => 'datetime',
+            'required_runner_tags' => 'array',
         ];
     }
 

@@ -13,8 +13,8 @@ class ScriptExecutionResult extends Model
     use HasUlids;
 
     protected $fillable = [
-        'script_id', 'script_name', 'language', 'username',
-        'started_at', 'completed_at', 'exit_code', 'output', 'pid',
+        'script_id', 'runner_id', 'script_name', 'language', 'username',
+        'started_at', 'completed_at', 'exit_code', 'output', 'pid', 'cancel_requested_at',
     ];
 
     protected function casts(): array
@@ -23,6 +23,7 @@ class ScriptExecutionResult extends Model
             'language' => ScriptLanguage::class,
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'cancel_requested_at' => 'datetime',
             'output' => 'array',
         ];
     }
@@ -34,6 +35,11 @@ class ScriptExecutionResult extends Model
     public function script(): BelongsTo
     {
         return $this->belongsTo(ScriptDefinition::class, 'script_id');
+    }
+
+    public function runner(): BelongsTo
+    {
+        return $this->belongsTo(Runner::class);
     }
 
     protected function isRunning(): Attribute

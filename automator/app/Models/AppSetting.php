@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AppSetting extends Model
 {
     protected $fillable = [
-        'execution_timeout_seconds', 'max_concurrent_executions', 'max_history_records',
+        'execution_timeout_seconds', 'max_history_records',
         'anthropic_api_key', 'anthropic_model', 'anthropic_effort',
     ];
 

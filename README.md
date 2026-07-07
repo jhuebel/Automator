@@ -71,27 +71,34 @@ To enable it: **Settings → AI Assistant** → paste your API key → choose a 
 ```
 Automator/
 ├── packaging/
-│   ├── build.sh                    # builds the linux-x64 release archive
+│   ├── build.sh                    # builds the linux-x64 release archive (app + runner binaries)
 │   ├── linux-common/               # shared systemd units and nginx config
 │   ├── ubuntu/                     # install.sh and uninstall.sh for Ubuntu
-│   └── rhel/                       # install.sh and uninstall.sh for RHEL / Rocky / Alma
-└── automator/                      # the Laravel application
-    ├── app/
-    │   ├── Enums/                  # ScriptLanguage, ScriptVariableType
-    │   ├── Events/                 # Broadcast events (script output, AI tokens)
-    │   ├── Jobs/                   # RunScriptJob, StreamClaudeCompletionJob
-    │   ├── Livewire/Settings/      # UserManagement, SystemStatus, AuditLogViewer
-    │   ├── Models/                 # ScriptDefinition, ScheduledJob, ScriptExecutionResult, AuditLog, AppSetting, User
-    │   ├── Services/               # DependencyCheckService
-    │   └── Console/Commands/       # DispatchDueJobs (scheduler tick)
-    ├── database/migrations/
-    ├── resources/
-    │   ├── js/                     # code-editor, script-terminal, ai-assistant, chart-widget (Alpine components)
-    │   └── views/livewire/pages/   # Dashboard, Script Library, Script Editor, Runner, History, Jobs, Settings, Help
-    └── routes/
-        ├── web.php                # page routes
-        ├── channels.php           # Reverb broadcast channel authorization
-        └── console.php            # scheduler registration
+│   ├── rhel/                       # install.sh and uninstall.sh for RHEL / Rocky / Alma
+│   └── runner/                     # per-OS runner packaging (systemd unit / NSSM installer)
+├── automator/                      # the Laravel application (management plane)
+│   ├── app/
+│   │   ├── Enums/                  # ScriptLanguage, ScriptVariableType
+│   │   ├── Events/                 # Broadcast events (script output, AI tokens, job assignment)
+│   │   ├── Jobs/                   # StreamClaudeCompletionJob, BroadcastDelayedEvent
+│   │   ├── Http/Controllers/Api/   # RunnerController (register/heartbeat/output/finish)
+│   │   ├── Livewire/Settings/      # UserManagement, RunnerManagement, SystemStatus, AuditLogViewer
+│   │   ├── Models/                 # ScriptDefinition, ScheduledJob, ScriptExecutionResult, Runner, AuditLog, AppSetting, User
+│   │   ├── Services/               # DependencyCheckService, RunnerAssignmentService
+│   │   └── Console/Commands/       # DispatchDueJobs (scheduler tick), SweepOfflineRunners, GenerateRunnerToken
+│   ├── database/migrations/
+│   ├── resources/
+│   │   ├── js/                     # code-editor, script-terminal, ai-assistant, chart-widget (Alpine components)
+│   │   └── views/livewire/pages/   # Dashboard, Script Library, Script Editor, Runner, History, Jobs, Settings, Help
+│   └── routes/
+│       ├── web.php                 # page routes
+│       ├── api.php                 # runner registration/heartbeat/output/finish (Sanctum)
+│       ├── channels.php            # Reverb broadcast channel authorization
+│       └── console.php             # scheduler + offline-sweep registration
+└── runner/                         # standalone Go agent (automator-runner) — executes scripts
+    ├── main.go, register.go, run.go
+    ├── executor.go, pusher.go, api.go  # subprocess execution, Reverb WS client, REST client
+    └── terminate_linux.go, terminate_windows.go  # OS-specific graceful cancellation
 ```
 
 ## Documentation

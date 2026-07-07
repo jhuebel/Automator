@@ -12,8 +12,6 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
 
     public int $executionTimeoutSeconds = 300;
 
-    public int $maxConcurrentExecutions = 5;
-
     public int $maxHistoryRecords = 1000;
 
     public string $anthropicApiKey = '';
@@ -39,7 +37,6 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
     {
         $settings = AppSetting::current();
         $this->executionTimeoutSeconds = $settings->execution_timeout_seconds;
-        $this->maxConcurrentExecutions = $settings->max_concurrent_executions;
         $this->maxHistoryRecords = $settings->max_history_records;
         $this->anthropicModel = $settings->anthropic_model;
         $this->anthropicEffort = $settings->anthropic_effort;
@@ -68,14 +65,12 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
 
         $validated = $this->validate([
             'executionTimeoutSeconds' => 'required|integer|min:1|max:86400',
-            'maxConcurrentExecutions' => 'required|integer|min:1|max:100',
             'maxHistoryRecords' => 'required|integer|min:1|max:100000',
         ]);
 
         $settings = AppSetting::current();
         $settings->update([
             'execution_timeout_seconds' => $validated['executionTimeoutSeconds'],
-            'max_concurrent_executions' => $validated['maxConcurrentExecutions'],
             'max_history_records' => $validated['maxHistoryRecords'],
         ]);
 
@@ -113,7 +108,7 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
 <div class="p-6 space-y-4">
     <div class="border-b border-gray-200">
         <nav class="flex gap-6 -mb-px">
-            @foreach (['application' => 'Application', 'users' => 'Users', 'ai' => 'AI Assistant', 'status' => 'System Status', 'audit' => 'Audit Logs'] as $key => $label)
+            @foreach (['application' => 'Application', 'users' => 'Users', 'runners' => 'Runners', 'ai' => 'AI Assistant', 'status' => 'System Status', 'audit' => 'Audit Logs'] as $key => $label)
                 <button
                     type="button"
                     wire:click="$set('tab', '{{ $key }}')"
@@ -139,12 +134,6 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
                 @error('executionTimeoutSeconds') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Max Concurrent Executions</label>
-                <input type="number" wire:model="maxConcurrentExecutions" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" />
-                <p class="text-xs text-gray-500 mt-1">Takes effect after the execution queue workers are restarted.</p>
-                @error('maxConcurrentExecutions') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
-            </div>
-            <div>
                 <label class="block text-sm font-medium text-gray-700">Max History Records</label>
                 <input type="number" wire:model="maxHistoryRecords" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm" />
                 @error('maxHistoryRecords') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
@@ -153,6 +142,8 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
         </div>
     @elseif ($tab === 'users')
         <livewire:settings.user-management />
+    @elseif ($tab === 'runners')
+        <livewire:settings.runner-management />
     @elseif ($tab === 'ai')
         <div class="bg-white rounded-lg border border-gray-200 p-4 max-w-lg space-y-4">
             <div class="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-md px-3 py-2">

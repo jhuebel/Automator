@@ -2,7 +2,7 @@
 
 return [
 
-    'version' => '2.0.0',
+    'version' => '2.1.0',
 
     'default_admin' => [
         'username' => env('AUTOMATOR_ADMIN_USERNAME', 'admin'),
@@ -27,7 +27,6 @@ return [
 
     'execution' => [
         'timeout_seconds' => env('AUTOMATOR_EXECUTION_TIMEOUT_SECONDS', 300),
-        'max_concurrent_executions' => env('AUTOMATOR_MAX_CONCURRENT_EXECUTIONS', 5),
         'max_history_records' => env('AUTOMATOR_MAX_HISTORY_RECORDS', 1000),
     ],
 

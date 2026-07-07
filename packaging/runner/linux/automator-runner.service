@@ -1,0 +1,18 @@
+[Unit]
+Description=Automator Runner
+After=network.target
+
+[Service]
+Type=simple
+User=automator-runner
+Group=automator-runner
+ExecStart=/opt/automator-runner/automator-runner run --config /etc/automator-runner/config.json
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/etc/automator-runner
+
+[Install]
+WantedBy=multi-user.target

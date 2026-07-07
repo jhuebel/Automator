@@ -13,3 +13,8 @@ Broadcast::channel('execution.{executionId}', function ($user) {
 Broadcast::channel('claude.completion.{requestId}', function ($user) {
     return $user->can('scripts.edit');
 });
+
+// Runners authenticate with a Sanctum bearer token, not a browser session.
+Broadcast::channel('runner.{runnerId}', function ($runner, $runnerId) {
+    return $runner instanceof \App\Models\Runner && (string) $runner->id === $runnerId;
+}, ['guards' => ['sanctum']]);

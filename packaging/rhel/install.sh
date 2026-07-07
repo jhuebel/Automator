@@ -5,9 +5,14 @@ set -euo pipefail
 # Automator — RHEL / Rocky / AlmaLinux install script
 # Run as root from within the extracted archive directory:
 #
-#   mkdir automator && tar -xzf automator-<version>-linux-x64.tar.gz -C automator
-#   cd automator
+#   mkdir automator-release && tar -xzf automator-<version>-linux-x64.tar.gz -C automator-release
+#   cd automator-release
 #   sudo bash packaging/rhel/install.sh
+#
+# Installs the management plane (nginx + PHP-FPM + Reverb + scheduler) AND
+# registers a local Go runner on this same host, since there is no local
+# execution path anymore — every script execution goes through a registered
+# runner, even on a single-box install.
 # ---------------------------------------------------------------------------
 
 APP_USER="automator"
@@ -16,10 +21,15 @@ DATA_DIR="/opt/automator/data"
 PHP_FPM_POOL="/etc/php-fpm.d/automator.conf"
 PHP_FPM_SOCK="/run/php-fpm/automator.sock"
 NGINX_CONF="/etc/nginx/conf.d/automator.conf"
-WORKER_COUNT=5
+
+RUNNER_USER="automator-runner"
+RUNNER_BIN_DIR="/opt/automator-runner"
+RUNNER_CONF_DIR="/etc/automator-runner"
+RUNNER_NAME="local-$(hostname)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ARCHIVE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APP_ROOT="$ARCHIVE_ROOT/automator"
 
 # --- helpers ----------------------------------------------------------------
 info()  { echo "[INFO]  $*"; }
@@ -29,6 +39,7 @@ die()   { echo "[ERROR] $*" >&2; exit 1; }
 # --- checks -----------------------------------------------------------------
 [[ $EUID -eq 0 ]] || die "This script must be run as root (use sudo)."
 [[ -f "$APP_ROOT/artisan" ]] || die "artisan not found in $APP_ROOT. Extract the archive first and run this script from within it."
+[[ -f "$ARCHIVE_ROOT/runner/linux/automator-runner" ]] || die "runner binary not found in $ARCHIVE_ROOT/runner/linux. Extract the archive first and run this script from within it."
 
 FIRST_INSTALL=1
 [[ -f "$DATA_DIR/database.sqlite" ]] && FIRST_INSTALL=0
@@ -50,7 +61,7 @@ mkdir -p "$APP_DIR" "$DATA_DIR"
 
 # --- copy application files -------------------------------------------------
 info "Copying application files..."
-find "$APP_ROOT" -maxdepth 1 -mindepth 1 ! -name "packaging" -exec cp -r {} "$APP_DIR/" \;
+find "$APP_ROOT" -maxdepth 1 -mindepth 1 -exec cp -r {} "$APP_DIR/" \;
 mkdir -p "$APP_DIR/storage/framework/"{cache,sessions,views} "$APP_DIR/storage/logs"
 
 # --- write production .env ---------------------------------------------------
@@ -120,23 +131,22 @@ EOF
 systemctl enable --now php-fpm
 systemctl restart php-fpm
 
-# --- install systemd units ---------------------------------------------------
+# --- install systemd units (management plane) --------------------------------
 info "Installing systemd units..."
-cp "$APP_ROOT/packaging/linux-common/automator-worker@.service"   /etc/systemd/system/
-cp "$APP_ROOT/packaging/linux-common/automator-reverb.service"     /etc/systemd/system/
-cp "$APP_ROOT/packaging/linux-common/automator-scheduler.service"  /etc/systemd/system/
-cp "$APP_ROOT/packaging/linux-common/automator-scheduler.timer"    /etc/systemd/system/
+cp "$ARCHIVE_ROOT/packaging/linux-common/automator-reverb.service"        /etc/systemd/system/
+cp "$ARCHIVE_ROOT/packaging/linux-common/automator-scheduler.service"     /etc/systemd/system/
+cp "$ARCHIVE_ROOT/packaging/linux-common/automator-scheduler.timer"       /etc/systemd/system/
+cp "$ARCHIVE_ROOT/packaging/linux-common/automator-runner-sweep.service"  /etc/systemd/system/
+cp "$ARCHIVE_ROOT/packaging/linux-common/automator-runner-sweep.timer"    /etc/systemd/system/
 systemctl daemon-reload
 
 systemctl enable --now automator-reverb
 systemctl enable --now automator-scheduler.timer
-for i in $(seq 1 "$WORKER_COUNT"); do
-    systemctl enable --now "automator-worker@$i"
-done
+systemctl enable --now automator-runner-sweep.timer
 
 # --- configure nginx ---------------------------------------------------------
 info "Configuring nginx..."
-cp "$APP_ROOT/packaging/linux-common/nginx-automator.conf" "$NGINX_CONF"
+cp "$ARCHIVE_ROOT/packaging/linux-common/nginx-automator.conf" "$NGINX_CONF"
 sed -i "s#unix:/run/php/automator.sock#unix:$PHP_FPM_SOCK#" "$NGINX_CONF"
 nginx -t
 systemctl enable --now nginx
@@ -155,13 +165,46 @@ if systemctl is-active --quiet firewalld 2>/dev/null; then
     firewall-cmd --reload
 fi
 
+# --- install and register a local runner on this same host -------------------
+if [[ ! -f "$RUNNER_CONF_DIR/config.json" ]]; then
+    info "Installing local runner..."
+    if ! id "$RUNNER_USER" &>/dev/null; then
+        useradd --system --no-create-home --shell /sbin/nologin "$RUNNER_USER"
+    fi
+
+    mkdir -p "$RUNNER_BIN_DIR" "$RUNNER_CONF_DIR"
+    cp "$ARCHIVE_ROOT/runner/linux/automator-runner" "$RUNNER_BIN_DIR/automator-runner"
+    chmod +x "$RUNNER_BIN_DIR/automator-runner"
+    cp "$ARCHIVE_ROOT/runner/linux/automator-runner.service" /etc/systemd/system/
+    chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_BIN_DIR" "$RUNNER_CONF_DIR"
+    systemctl daemon-reload
+
+    info "Generating a one-time enrollment token and registering the local runner..."
+    ENROLLMENT_TOKEN=$(sudo -u "$APP_USER" php "$APP_DIR/artisan" automator:generate-runner-token --ttl=5 | tail -n1)
+
+    sudo -u "$RUNNER_USER" "$RUNNER_BIN_DIR/automator-runner" register \
+        --server "http://127.0.0.1" \
+        --token "$ENROLLMENT_TOKEN" \
+        --name "$RUNNER_NAME" \
+        --tags linux \
+        --config "$RUNNER_CONF_DIR/config.json"
+
+    chown "$RUNNER_USER:$RUNNER_USER" "$RUNNER_CONF_DIR/config.json"
+    chmod 600 "$RUNNER_CONF_DIR/config.json"
+
+    systemctl enable --now automator-runner
+else
+    info "Local runner already registered, skipping enrollment."
+fi
+
 # --- done -------------------------------------------------------------------
 info ""
 info "Automator installed successfully!"
-info "  App:      http://$(hostname -I | awk '{print $1}')"
-info "  Workers:  systemctl status 'automator-worker@*'"
-info "  Reverb:   journalctl -u automator-reverb -f"
+info "  App:       http://$(hostname -I | awk '{print $1}')"
+info "  Runner:    systemctl status automator-runner"
+info "  Reverb:    journalctl -u automator-reverb -f"
 info "  Scheduler: journalctl -u automator-scheduler -f"
-info "  Data:     $DATA_DIR"
+info "  Data:      $DATA_DIR"
 info ""
+info "Register additional runners (on this host or others) from Settings > Runners."
 warn "Default credentials are admin/Admin1234! — change them immediately."

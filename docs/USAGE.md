@@ -101,7 +101,7 @@ terraform {
 
 ### Requirements
 
-`terraform` must be installed and available on the system PATH. Check **Settings → System Status** to verify it is detected.
+`terraform` must be installed and available on the PATH of whichever runner executes the job.
 
 ## Script Runner
 
@@ -113,7 +113,9 @@ Output streams line-by-line in real time. Click **Cancel** to terminate the proc
 
 Exit code `0` = success; any other value = failure.
 
-Scripts run as the OS user hosting the application and inherit its environment variables.
+Scripts run on whichever runner is assigned the job (least-busy among online runners,
+or a runner matching the job's required tags), as that runner's OS user, and inherit its
+environment variables — not the management plane's.
 
 ## Job Scheduler
 
