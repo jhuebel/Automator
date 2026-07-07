@@ -1,0 +1,19 @@
+[Unit]
+Description=Automator Reverb WebSocket server
+After=network.target
+
+[Service]
+Type=simple
+User=automator
+Group=automator
+WorkingDirectory=/opt/automator/app
+ExecStart=/usr/bin/php /opt/automator/app/artisan reverb:start --host=127.0.0.1 --port=8080
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/automator/app/storage
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Automator scheduler tick every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1sec
+Persistent=true
+
+[Install]
+WantedBy=timers.target

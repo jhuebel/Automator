@@ -1,6 +1,6 @@
 # Automator
 
-A cross-platform web application for managing and automating IaaS scripts. Built with ASP.NET Core 9 Blazor Server, it runs on Windows Server and all major Linux distributions.
+A web application for managing and automating IaaS scripts. Built with Laravel, Livewire, and Reverb, it runs on any Linux distribution with PHP 8.3+.
 
 ## Features
 
@@ -21,13 +21,13 @@ A cross-platform web application for managing and automating IaaS scripts. Built
 
 ## Supported Languages
 
-| Language | Windows | Linux |
-|---|---|---|
-| Bash | via WSL | `/bin/bash` |
-| PowerShell | `powershell.exe` | `pwsh` (PowerShell Core) |
-| Python | `python.exe` | `python3` |
-| Ansible Playbook | — | `ansible-playbook` |
-| Terraform | `terraform.exe` | `terraform` |
+| Language | Runs via |
+|---|---|
+| Bash | `/bin/bash` |
+| PowerShell | `pwsh` (PowerShell Core) |
+| Python | `python3` |
+| Ansible Playbook | `ansible-playbook` |
+| Terraform | `terraform` (init + apply, in a per-run temp directory) |
 
 ## Roles
 
@@ -55,13 +55,15 @@ To enable it: **Settings → AI Assistant** → paste your API key → choose a 
 
 ## Tech Stack
 
-- [ASP.NET Core 9](https://learn.microsoft.com/aspnet/core) — web framework
-- [Blazor Server](https://learn.microsoft.com/aspnet/core/blazor) — interactive UI with real-time output streaming
-- [ASP.NET Core Identity](https://learn.microsoft.com/aspnet/core/security/authentication/identity) — authentication and role-based authorization
-- [Entity Framework Core 9](https://learn.microsoft.com/ef/core) — ORM; SQLite (default) or MySQL/MariaDB
-- [MudBlazor 9](https://mudblazor.com) — component library
-- [CodeMirror 5](https://codemirror.net/5/) — syntax-highlighted editor (vendored, no CDN)
-- [Cronos](https://github.com/HangfireIO/Cronos) — cron expression parsing
+- [Laravel 13](https://laravel.com) — web framework
+- [Livewire 3](https://livewire.laravel.com) + [Volt](https://livewire.laravel.com/docs/volt) — reactive server-rendered UI
+- [Laravel Reverb](https://reverb.laravel.com) — WebSocket broadcasting for live script output and AI token streaming
+- [Alpine.js](https://alpinejs.dev) — client-side glue for CodeMirror, charts, and the terminal/AI panels
+- [spatie/laravel-permission](https://spatie.be/docs/laravel-permission) — role-based authorization
+- Eloquent ORM — SQLite (default) or MySQL/MariaDB
+- [CodeMirror 6](https://codemirror.net) — syntax-highlighted editor
+- [Chart.js](https://www.chartjs.org) — dashboard charts
+- [dragonmantank/cron-expression](https://github.com/dragonmantank/cron-expression) — cron expression parsing
 - [Anthropic API](https://docs.anthropic.com/en/api/getting-started) — Claude AI assistant (optional)
 
 ## Project Structure
@@ -69,43 +71,28 @@ To enable it: **Settings → AI Assistant** → paste your API key → choose a 
 ```
 Automator/
 ├── packaging/
-│   ├── build.sh                    # builds linux-x64 and win-x64 release archives
-│   ├── linux-common/               # shared systemd unit and nginx config
+│   ├── build.sh                    # builds the linux-x64 release archive
+│   ├── linux-common/               # shared systemd units and nginx config
 │   ├── ubuntu/                     # install.sh and uninstall.sh for Ubuntu
-│   ├── rhel/                       # install.sh and uninstall.sh for RHEL / Rocky / Alma
-│   └── windows/                    # install.ps1 and uninstall.ps1 for Windows Server
-├── src/
-│   └── Automator.Web/
-│       ├── Components/
-│       │   ├── Layout/             # Shell layout, nav sidebar, header
-│       │   ├── Pages/              # Dashboard, Script Library, ScriptEditor, Runner, History, Jobs, Settings, Help
-│       │   └── Shared/             # CodeEditor, HelpDrawer, help sections, PageHelp, HelpIcon, panels
-│       ├── Data/
-│       │   ├── AutomatorDbContext.cs   # EF Core context
-│       │   └── DataSeeder.cs           # First-run role, user, and settings seeding
-│       ├── Models/                 # ScriptDefinition, ScriptVariable, ScheduledJob, ScriptExecutionResult, AuditLog, AppSetting
-│       ├── Services/
-│       │   ├── ScriptRunnerService         # Executes scripts as subprocesses, persists results
-│       │   ├── JobSchedulerService         # Cron job store
-│       │   ├── SchedulerBackgroundService  # 15s tick, fires due jobs
-│       │   ├── AuditLogService             # Writes audit entries to DB
-│       │   ├── ClaudeService               # Anthropic API client with SSE streaming
-│       │   ├── DependencyCheckService      # Probes runtimes for System Status page
-│       │   └── HelpDrawerState             # Scoped state service for the help drawer
-│       └── wwwroot/
-│           └── lib/codemirror/             # CodeMirror 5 — vendored, no CDN dependency
-└── Automator.sln
+│   └── rhel/                       # install.sh and uninstall.sh for RHEL / Rocky / Alma
+└── automator/                      # the Laravel application
+    ├── app/
+    │   ├── Enums/                  # ScriptLanguage, ScriptVariableType
+    │   ├── Events/                 # Broadcast events (script output, AI tokens)
+    │   ├── Jobs/                   # RunScriptJob, StreamClaudeCompletionJob
+    │   ├── Livewire/Settings/      # UserManagement, SystemStatus, AuditLogViewer
+    │   ├── Models/                 # ScriptDefinition, ScheduledJob, ScriptExecutionResult, AuditLog, AppSetting, User
+    │   ├── Services/               # DependencyCheckService
+    │   └── Console/Commands/       # DispatchDueJobs (scheduler tick)
+    ├── database/migrations/
+    ├── resources/
+    │   ├── js/                     # code-editor, script-terminal, ai-assistant, chart-widget (Alpine components)
+    │   └── views/livewire/pages/   # Dashboard, Script Library, Script Editor, Runner, History, Jobs, Settings, Help
+    └── routes/
+        ├── web.php                # page routes
+        ├── channels.php           # Reverb broadcast channel authorization
+        └── console.php            # scheduler registration
 ```
-
-## Screenshots
-
-| Dashboard | Script Editor |
-|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Script Editor](docs/screenshots/script-editor.png) |
-
-| Scheduled Jobs | Settings — AI Assistant |
-|---|---|
-| ![Scheduled Jobs](docs/screenshots/scheduled-jobs.png) | ![Settings](docs/screenshots/settings-ai.png) |
 
 ## Documentation
 

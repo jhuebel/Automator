@@ -1,36 +1,11 @@
-# Build outputs
-bin/
-obj/
-
-# User-specific files
-*.user
-*.suo
-.vs/
-
-# NuGet
-*.nupkg
-*.snupkg
-packages/
-project.lock.json
-project.fragment.lock.json
-
-# ASP.NET Core
-appsettings.*.json
-!appsettings.json
-!appsettings.Development.json
-
-# SQLite database
-*.db
-*.db-shm
-*.db-wal
+# Release archives
+/dist/
+/build/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Rider/VS Code
+# Editors
 .idea/
 .vscode/
-
-# dotnet tool manifests
-.config/dotnet-tools.json

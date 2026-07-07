@@ -1,7 +1,0 @@
-@page "/status"
-@attribute [Authorize]
-@inject NavigationManager Nav
-
-@code {
-    protected override void OnInitialized() => Nav.NavigateTo("/settings?tab=status", replace: true);
-}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Automator scheduler tick (dispatches due scheduled jobs)
+
+[Service]
+Type=oneshot
+User=automator
+Group=automator
+WorkingDirectory=/opt/automator/app
+ExecStart=/usr/bin/php /opt/automator/app/artisan schedule:run

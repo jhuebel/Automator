@@ -1,8 +1,13 @@
 # Installation
 
+Automator is a Laravel application. It requires PHP, a queue worker, Laravel Reverb
+(WebSocket broadcasting), a scheduler tick, and a web server in front of PHP-FPM.
+
 ## Pre-built Packages
 
-Download the latest release archive for your platform from the [Releases page](https://github.com/jhuebel/Automator/releases).
+Download the latest release archive from the [Releases page](https://github.com/jhuebel/Automator/releases).
+The archive ships a pre-built app (`vendor/` installed, frontend assets compiled), so the
+target box only needs PHP, nginx, and Composer — not Node.
 
 ### Ubuntu
 
@@ -13,10 +18,13 @@ sudo bash packaging/ubuntu/install.sh
 ```
 
 The install script:
-- Installs `nginx` via `apt-get`
+- Installs `nginx`, PHP 8.3 (`fpm`, `cli`, `sqlite3`, `mbstring`, `xml`, `curl`, `bcmath`) via `apt-get`
 - Creates an `automator` system user
-- Copies the app to `/opt/automator/app`
-- Creates a systemd service and enables it at boot
+- Copies the app to `/opt/automator/app` and the SQLite database to `/opt/automator/data`
+- Generates a production `.env` (app key, Reverb credentials, SQLite path)
+- Runs migrations (and seeds default roles/users/example scripts on first install only)
+- Configures a dedicated php-fpm pool
+- Installs systemd units for the queue workers, Reverb, and the scheduler timer
 - Writes an nginx reverse proxy config to `/etc/nginx/conf.d/automator.conf`
 
 ### RHEL / Rocky / AlmaLinux
@@ -27,58 +35,28 @@ cd automator
 sudo bash packaging/rhel/install.sh
 ```
 
-Same as Ubuntu, but uses `dnf`, applies `setsebool -P httpd_can_network_connect 1` for SELinux, and opens the HTTP port via `firewall-cmd` if firewalld is active.
-
-### Windows Server
-
-Requires IIS with [URL Rewrite 2.1](https://www.iis.net/downloads/microsoft/url-rewrite) and [Application Request Routing 3.0](https://www.iis.net/downloads/microsoft/application-request-routing) for the reverse proxy. Run in an elevated PowerShell session:
-
-```powershell
-Expand-Archive automator-<version>-win-x64.zip -DestinationPath C:\automator-install
-Set-ExecutionPolicy -Scope Process Bypass
-C:\automator-install\install.ps1
-```
-
-The install script:
-- Copies the app to `C:\Program Files\Automator\app`
-- Installs it as a Windows Service with `ASPNETCORE_ENVIRONMENT=Production`
-- Creates an IIS site on port 80 with an ARR reverse proxy rule
-
-Pass `-SkipIis` to install only the Windows Service (app listens on `http://127.0.0.1:5000` directly).
+Same as Ubuntu, but uses `dnf`, applies `setsebool -P httpd_can_network_connect 1` for
+SELinux, and opens the HTTP port via `firewall-cmd` if firewalld is active.
 
 ### Installed paths
 
-**Linux**
-
 | Path | Contents |
 |---|---|
-| `/opt/automator/app` | Application binary and assets |
-| `/opt/automator/data` | SQLite database (`automator.db`) |
-| `/etc/automator/environment` | Optional env-var overrides — create this file manually |
-| `/etc/systemd/system/automator.service` | Systemd unit |
-| `/etc/nginx/conf.d/automator.conf` | nginx reverse proxy config |
-
-**Windows**
-
-| Path | Contents |
-|---|---|
-| `C:\Program Files\Automator\app` | Application binary and assets |
-| `C:\ProgramData\Automator` | SQLite database |
+| `/opt/automator/app` | Application code, `vendor/`, compiled frontend assets |
+| `/opt/automator/data` | SQLite database (`database.sqlite`) |
+| `/opt/automator/app/.env` | App key, database, queue, and Reverb configuration |
+| `/etc/systemd/system/automator-worker@.service` | Queue worker template (instances `1`–`5`) |
+| `/etc/systemd/system/automator-reverb.service` | Reverb WebSocket broadcasting server |
+| `/etc/systemd/system/automator-scheduler.{service,timer}` | Scheduler tick, fired every minute |
+| `/etc/php/8.3/fpm/pool.d/automator.conf` (Ubuntu) or `/etc/php-fpm.d/automator.conf` (RHEL) | Dedicated php-fpm pool |
+| `/etc/nginx/conf.d/automator.conf` | nginx reverse proxy config (app + Reverb) |
 
 ### Uninstall
-
-**Linux** — re-extract the archive and run the uninstall script:
 
 ```bash
 mkdir automator && tar -xzf automator-<version>-linux-x64.tar.gz -C automator
 cd automator
 sudo bash packaging/ubuntu/uninstall.sh   # or packaging/rhel/uninstall.sh
-```
-
-**Windows** (elevated PowerShell):
-
-```powershell
-C:\automator-install\uninstall.ps1
 ```
 
 ---
@@ -87,41 +65,41 @@ C:\automator-install\uninstall.ps1
 
 ### Prerequisites
 
-- [.NET 9 SDK](https://dot.net)
+- PHP 8.3+ with `sqlite3`, `mbstring`, `xml`, `curl`, `bcmath` extensions
+- Composer
+- Node.js 20+ / npm (for building frontend assets)
 - Scripting runtimes you intend to use: `bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`
 
-### Install .NET 9 SDK (Linux — no root required)
-
-```bash
-curl -sSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 9.0
-echo 'export DOTNET_ROOT="$HOME/.dotnet"' >> ~/.bashrc
-echo 'export PATH="$HOME/.dotnet:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-### Run the App
+### Run the App (development)
 
 ```bash
 git clone https://github.com/jhuebel/Automator.git
-cd Automator
-dotnet run --project src/Automator.Web
+cd Automator/automator
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+composer run dev
 ```
 
-Open **http://localhost:5000** in your browser.
+`composer run dev` runs the app server, queue worker, Reverb, the scheduler, and the Vite
+dev server together. Open **http://localhost:8000** in your browser.
 
-### Build Release Archives
+### Build a Release Archive
 
 ```bash
 bash packaging/build.sh
 ```
 
-Produces `dist/automator-<version>-linux-x64.tar.gz` and `dist/automator-<version>-win-x64.zip`.
+Produces `dist/automator-<version>-linux-x64.tar.gz`.
 
 ---
 
 ## First Run
 
-On first run Automator creates `automator.db` and seeds roles and default users. **Change these credentials immediately in a production deployment.**
+On first install Automator seeds roles, default users, and a handful of example scripts.
+**Change these credentials immediately in a production deployment.**
 
 | Username | Password | Role |
 |---|---|---|
@@ -129,127 +107,87 @@ On first run Automator creates `automator.db` and seeds roles and default users.
 | `operator` | `Operator1234!` | Operator |
 | `viewer` | `Viewer1234!` | Viewer |
 
-Default credentials can be overridden via `appsettings.json` before first run:
+Default credentials can be overridden via environment variables before first install:
 
-```json
-"DefaultAdmin": { "Username": "myadmin", "Email": "admin@example.com", "Password": "MyStr0ng!" }
+```bash
+AUTOMATOR_ADMIN_USERNAME=myadmin
+AUTOMATOR_ADMIN_EMAIL=admin@example.com
+AUTOMATOR_ADMIN_PASSWORD='MyStr0ng!'
 ```
+
+(Also available for `AUTOMATOR_OPERATOR_*` and `AUTOMATOR_VIEWER_*`.) Add these to
+`/opt/automator/app/.env` before running the install script's migrate/seed step, or before
+your first `php artisan db:seed` in a manual setup.
 
 ---
 
 ## Configuration
 
-### Data File Location
+All configuration lives in `/opt/automator/app/.env`. Key settings:
 
-By default `automator.db` is created in the working directory. Pre-built packages write it to `/opt/automator/data/automator.db` (Linux) or `C:\ProgramData\Automator\automator.db` (Windows). To change it, set the connection string:
+### Database
 
-```json
-"ConnectionStrings": {
-  "DefaultConnection": "Data Source=/var/lib/automator/automator.db"
-}
-```
-
-### MySQL / MariaDB
-
-Set `DatabaseProvider` to `MySQL` (also accepted: `MariaDB`) and provide a connection string:
-
-```json
-"DatabaseProvider": "MySQL",
-"ConnectionStrings": {
-  "DefaultConnection": "Server=localhost;Database=automator;User=automator;Password=secret;"
-}
-```
-
-The database and user must exist before first run; Automator creates all tables automatically. The MySQL user needs `CREATE`, `ALTER`, `INDEX`, `SELECT`, `INSERT`, `UPDATE`, and `DELETE` privileges.
-
-Environment variables work too (useful in containers or for secrets):
+SQLite is the default and requires no extra setup:
 
 ```bash
-DatabaseProvider=MySQL
-ConnectionStrings__DefaultConnection="Server=db;Database=automator;User=automator;Password=secret;"
+DB_CONNECTION=sqlite
+DB_DATABASE=/opt/automator/data/database.sqlite
 ```
 
-On Linux, place these in `/etc/automator/environment` — the systemd unit loads it automatically via `EnvironmentFile`.
-
-### Secrets Override (Linux)
-
-Create `/etc/automator/environment` to set any configuration value as an environment variable without editing `appsettings.json`:
+For MySQL/MariaDB:
 
 ```bash
-# /etc/automator/environment
-ConnectionStrings__DefaultConnection="Data Source=/mnt/nas/automator.db"
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_DATABASE=automator
+DB_USERNAME=automator
+DB_PASSWORD=secret
 ```
 
-Restart the service after editing: `systemctl restart automator`.
+Run `php artisan migrate --force` after changing the connection.
+
+### Queue / Execution Concurrency
+
+Script executions run as queued jobs on the `executions` queue. The number of running
+`automator-worker@N` systemd instances is the concurrency ceiling — matching the
+"Max Concurrent Executions" value in Settings requires enabling/disabling worker instances:
+
+```bash
+sudo systemctl enable --now automator-worker@6   # raise from 5 to 6 workers
+sudo systemctl disable --now automator-worker@6  # lower back down
+```
+
+### Reverb (live output streaming)
+
+Reverb powers the live script-output terminal and the AI assistant's streaming responses.
+It listens on `127.0.0.1:8080` by default and is reverse-proxied through nginx at `/app/`.
+The install script generates `REVERB_APP_KEY`/`REVERB_APP_SECRET` automatically. If you
+change them, restart both `automator-reverb` and php-fpm.
+
+### AI Assistant
+
+Configure the Anthropic API key, model, and effort level from **Settings → AI Assistant**
+in the app (stored encrypted in the database) — no `.env` changes needed.
 
 ---
 
 ## Manual Service Installation
 
-Use this section if you built from source and want to deploy without the pre-built packaging scripts.
+Use this section if you built from source and want to deploy without the pre-built
+packaging scripts. See `packaging/linux-common/` for the exact unit files and nginx config
+referenced below.
 
-### Linux — systemd + nginx
-
-Publish a self-contained binary:
-
-```bash
-dotnet publish src/Automator.Web -c Release --self-contained true -r linux-x64 -o /opt/automator/app
-```
-
-Create a systemd unit at `/etc/systemd/system/automator.service`:
-
-```ini
-[Unit]
-Description=Automator
-After=network.target
-
-[Service]
-Type=simple
-User=automator
-Group=automator
-WorkingDirectory=/opt/automator/app
-ExecStart=/opt/automator/app/Automator.Web
-Restart=on-failure
-EnvironmentFile=-/etc/automator/environment
-Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
-Environment=ASPNETCORE_ENVIRONMENT=Production
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ReadWritePaths=/opt/automator/data
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Create an nginx reverse proxy config at `/etc/nginx/conf.d/automator.conf`:
-
-```nginx
-server {
-    listen 80;
-    server_name _;
-
-    location / {
-        proxy_pass         http://127.0.0.1:5000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_read_timeout 3600s;
-    }
-}
-```
-
-Enable and start:
-
-```bash
-systemctl daemon-reload
-systemctl enable --now automator
-nginx -t && systemctl restart nginx
-```
+1. Install PHP 8.3+, Composer, nginx, and the script runtimes you need.
+2. Copy the app to `/opt/automator/app`, run `composer install --no-dev --optimize-autoloader`.
+3. Configure `.env` (database, `QUEUE_CONNECTION=database`, `BROADCAST_CONNECTION=reverb`, Reverb credentials).
+4. `php artisan key:generate --force && php artisan migrate --force && php artisan db:seed --force`
+5. Configure a php-fpm pool running as a dedicated `automator` user.
+6. Install and enable the systemd units from `packaging/linux-common/`:
+   - `automator-worker@.service` (enable N instances for your desired concurrency)
+   - `automator-reverb.service`
+   - `automator-scheduler.timer` (+ its paired `.service`)
+7. Install `packaging/linux-common/nginx-automator.conf` to your nginx `conf.d/`, adjusting
+   the php-fpm socket path if needed, then `nginx -t && systemctl restart nginx`.
 
 On RHEL / Rocky / AlmaLinux, also run:
 
@@ -258,26 +196,3 @@ setsebool -P httpd_can_network_connect 1      # SELinux
 firewall-cmd --permanent --add-service=http   # firewalld
 firewall-cmd --reload
 ```
-
-### Windows — Windows Service
-
-Publish a self-contained binary:
-
-```powershell
-dotnet publish src/Automator.Web -c Release --self-contained true -r win-x64 -o "C:\Program Files\Automator\app"
-```
-
-Register the Windows Service:
-
-```powershell
-sc.exe create Automator binPath= '"C:\Program Files\Automator\app\Automator.Web.exe"' start= auto
-# Set environment variables
-$reg = "HKLM:\SYSTEM\CurrentControlSet\Services\Automator"
-New-ItemProperty $reg -Name Environment -Value @(
-    "ASPNETCORE_URLS=http://127.0.0.1:5000",
-    "ASPNETCORE_ENVIRONMENT=Production"
-) -PropertyType MultiString -Force
-Start-Service Automator
-```
-
-Configure IIS as a reverse proxy using URL Rewrite 2.1 and Application Request Routing 3.0. See the `packaging/windows/install.ps1` script for a complete example.

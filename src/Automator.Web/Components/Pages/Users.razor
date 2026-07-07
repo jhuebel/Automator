@@ -1,7 +1,0 @@
-@page "/users"
-@attribute [Authorize(Roles = "Admin")]
-@inject NavigationManager Nav
-
-@code {
-    protected override void OnInitialized() => Nav.NavigateTo("/settings?tab=users", replace: true);
-}

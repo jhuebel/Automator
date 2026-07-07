@@ -20,7 +20,8 @@ Variables are defined on the **Variables** tab and injected into the script proc
 |---|---|---|
 | **Text** | Any string value | `$VAR` / `$env:VAR` / `os.environ['VAR']` / `var.VAR` (Terraform) |
 | **Number** | Numeric value; validated before run | same as Text — arrives as a string |
-| **Array** | Comma-separated list of values | parse with `IFS`, `-split`, or `.split(',')` |
+| **Boolean** | True/false checkbox | arrives as the string `true` or `false` |
+| **List** | Comma-separated list of values | parse with `IFS`, `-split`, or `.split(',')` |
 
 ### Accessing Variables
 
@@ -116,7 +117,7 @@ Scripts run as the OS user hosting the application and inherit its environment v
 
 ## Job Scheduler
 
-Scheduled jobs run scripts automatically on a cron schedule. The background service checks for due jobs every 15 seconds.
+Scheduled jobs run scripts automatically on a cron schedule. A scheduler tick runs once a minute, so jobs fire within about 60 seconds of their exact due time.
 
 - **Enable / Disable** — toggle a job without deleting it.
 - **Run Now** — trigger a job immediately outside its schedule.
