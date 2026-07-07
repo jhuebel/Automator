@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class SystemStatus extends Component
 {
-    public array $runtimes = [];
+    public array $runnerRuntimes = [];
 
     public array $database = [];
 
@@ -22,7 +22,7 @@ class SystemStatus extends Component
     {
         $service = app(DependencyCheckService::class);
 
-        $this->runtimes = $service->checkRuntimes();
+        $this->runnerRuntimes = $service->runnerRuntimes();
         $this->database = $service->databaseStatus();
         $this->appInfo = $service->appInfo();
     }

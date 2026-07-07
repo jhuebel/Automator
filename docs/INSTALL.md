@@ -81,7 +81,11 @@ sudo bash packaging/ubuntu/uninstall.sh   # or packaging/rhel/uninstall.sh
 - PHP 8.3+ with `sqlite3`, `mbstring`, `xml`, `curl`, `bcmath` extensions
 - Composer
 - Node.js 20+ / npm (for building frontend assets)
-- Scripting runtimes you intend to use: `bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`
+- Go (see `runner/go.mod` for the required version; for building the `automator-runner` binary)
+- Scripting runtimes you intend to use — `bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform` —
+  installed on whichever host(s) run the `automator-runner` agent, not necessarily on the management
+  plane host itself. In local dev the auto-registered runner runs on the same machine, so install them
+  here too. Settings → System Status shows what each registered runner reports.
 
 ### Run the App (development)
 

@@ -70,7 +70,22 @@ class RunnerController extends Controller
 
     public function heartbeat(Request $request)
     {
+        $validated = $request->validate([
+            'runtimes' => 'nullable|array',
+            'runtimes.*.name' => 'required_with:runtimes|string',
+            'runtimes.*.description' => 'nullable|string',
+            'runtimes.*.available' => 'boolean',
+            'runtimes.*.version' => 'nullable|string',
+            'runtimes.*.path' => 'nullable|string',
+            'runtimes.*.error' => 'nullable|string',
+        ]);
+
         $runner = $request->user();
+
+        if (array_key_exists('runtimes', $validated)) {
+            $runner->runtimes = $validated['runtimes'];
+        }
+
         $runner->markSeen();
 
         return response()->json(['status' => 'ok']);

@@ -101,7 +101,9 @@ terraform {
 
 ### Requirements
 
-`terraform` must be installed and available on the PATH of whichever runner executes the job.
+`terraform` must be installed and available on the PATH of whichever runner executes the job. Check
+**Settings → System Status** to see which runners currently report it (and the other script
+runtimes) as available.
 
 ## Script Runner
 

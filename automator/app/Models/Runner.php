@@ -12,7 +12,7 @@ class Runner extends Model
     use HasApiTokens, HasUlids;
 
     protected $fillable = [
-        'name', 'hostname', 'os', 'tags', 'status',
+        'name', 'hostname', 'os', 'tags', 'runtimes', 'status',
         'last_seen_at', 'current_job_count', 'max_concurrent_jobs',
     ];
 
@@ -20,6 +20,7 @@ class Runner extends Model
     {
         return [
             'tags' => 'array',
+            'runtimes' => 'array',
             'last_seen_at' => 'datetime',
         ];
     }
