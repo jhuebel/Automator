@@ -11,9 +11,11 @@
         "laravel/framework": "^13.8",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
+        "laravel/socialite": "^5.28",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "^3.6.4",
         "livewire/volt": "^1.7.0",
+        "socialiteproviders/microsoft": "^4.9",
         "spatie/laravel-permission": "^8.3",
         "symfony/process": "^8.1"
     },

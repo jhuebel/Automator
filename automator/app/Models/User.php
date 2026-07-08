@@ -30,4 +30,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * False for SSO-only accounts that were auto-provisioned without ever
+     * setting a local password.
+     */
+    public function hasPassword(): bool
+    {
+        return filled($this->password);
+    }
 }

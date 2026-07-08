@@ -108,6 +108,7 @@ Automator/
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — management plane vs. runner split, request/execution flow, component map
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — full database schema reference
 - [docs/RUNNER_PROTOCOL.md](docs/RUNNER_PROTOCOL.md) — runner enrollment, REST, and WebSocket protocol reference
+- [docs/SSO.md](docs/SSO.md) — Microsoft Entra ID / Google SSO setup and account-provisioning reference
 
 ## License
 

@@ -108,7 +108,7 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
 <div class="p-6 space-y-4">
     <div class="border-b border-gray-200">
         <nav class="flex gap-6 -mb-px">
-            @foreach (['application' => 'Application', 'users' => 'Users', 'runners' => 'Runners', 'ai' => 'AI Assistant', 'status' => 'System Status', 'audit' => 'Audit Logs'] as $key => $label)
+            @foreach (['application' => 'Application', 'users' => 'Users', 'runners' => 'Runners', 'sso' => 'Single Sign-On', 'ai' => 'AI Assistant', 'status' => 'System Status', 'audit' => 'Audit Logs'] as $key => $label)
                 <button
                     type="button"
                     wire:click="$set('tab', '{{ $key }}')"
@@ -144,6 +144,8 @@ new #[Layout('layouts.app', ['title' => 'Settings'])] class extends Component
         <livewire:settings.user-management />
     @elseif ($tab === 'runners')
         <livewire:settings.runner-management />
+    @elseif ($tab === 'sso')
+        <livewire:settings.sso-configuration />
     @elseif ($tab === 'ai')
         <div class="bg-white rounded-lg border border-gray-200 p-4 max-w-lg space-y-4">
             <div class="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-md px-3 py-2">
