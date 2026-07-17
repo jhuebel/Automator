@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Runner;
+use App\Models\RunnerGroup;
 use App\Models\ScriptDefinition;
 use App\Models\ScriptExecutionResult;
 use App\Services\RunnerAssignmentService;
@@ -59,6 +60,16 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
             ->values();
     }
 
+    #[Computed]
+    public function runnerGroups()
+    {
+        $language = $this->selectedScript?->language;
+
+        return RunnerGroup::with('runners')->orderBy('name')->get()
+            ->filter(fn (RunnerGroup $group) => ! $language || $group->supportsLanguage($language))
+            ->values();
+    }
+
     public function selectScript(string $id): void
     {
         $this->scriptId = $id;
@@ -76,6 +87,19 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
         // clear itself; otherwise the previous script's output just sits
         // there under the newly-selected script.
         $this->dispatch('script-selected');
+    }
+
+    /**
+     * The runner picker's value is discriminated: '' = Auto, 'r:<id>' = a
+     * specific runner, 'g:<id>' = a runner group. Returns [runnerId, groupId].
+     */
+    private function parseRunnerTarget(string $value): array
+    {
+        return match (true) {
+            str_starts_with($value, 'r:') => [substr($value, 2), null],
+            str_starts_with($value, 'g:') => [null, substr($value, 2)],
+            default => [null, null],
+        };
     }
 
     private function populateDefaults(): void
@@ -110,7 +134,8 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
             'output' => [],
         ]);
 
-        app(RunnerAssignmentService::class)->assign($result, null, filled($this->runnerId) ? $this->runnerId : null);
+        [$runnerId, $groupId] = $this->parseRunnerTarget($this->runnerId);
+        app(RunnerAssignmentService::class)->assign($result, null, $runnerId, $groupId);
 
         $this->executionId = $result->id;
         $this->exitCode = null;
@@ -171,9 +196,20 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
                         @unless ($isRunning)
                             <select wire:model="runnerId" class="rounded-md border-gray-300 shadow-sm text-sm">
                                 <option value="">Auto (least busy)</option>
-                                @foreach ($this->onlineRunners as $runner)
-                                    <option value="{{ $runner->id }}">{{ $runner->name }}</option>
-                                @endforeach
+                                @if ($this->runnerGroups->isNotEmpty())
+                                    <optgroup label="Runner Groups">
+                                        @foreach ($this->runnerGroups as $group)
+                                            <option value="g:{{ $group->id }}">{{ $group->name }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                                @if ($this->onlineRunners->isNotEmpty())
+                                    <optgroup label="Individual Runners">
+                                        @foreach ($this->onlineRunners as $runner)
+                                            <option value="r:{{ $runner->id }}">{{ $runner->name }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
                             </select>
                         @endunless
                         @if ($isRunning)

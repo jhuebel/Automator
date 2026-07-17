@@ -54,7 +54,7 @@ class DispatchDueJobs extends Command
                 'output' => [],
             ]);
 
-            $this->assignment->assign($result, $job->required_runner_tags, $job->preferred_runner_id);
+            $this->assignment->assign($result, $job->required_runner_tags, $job->preferred_runner_id, $job->preferred_runner_group_id);
 
             $job->update(['current_execution_id' => $result->id]);
 

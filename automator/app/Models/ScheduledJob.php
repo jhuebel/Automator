@@ -14,7 +14,7 @@ class ScheduledJob extends Model
 
     protected $fillable = [
         'name', 'script_id', 'cron_expression', 'is_enabled', 'required_runner_tags', 'preferred_runner_id',
-        'last_run_at', 'next_run_at', 'last_exit_code', 'current_execution_id',
+        'preferred_runner_group_id', 'last_run_at', 'next_run_at', 'last_exit_code', 'current_execution_id',
     ];
 
     protected function casts(): array
@@ -35,6 +35,11 @@ class ScheduledJob extends Model
     public function preferredRunner(): BelongsTo
     {
         return $this->belongsTo(Runner::class, 'preferred_runner_id');
+    }
+
+    public function preferredRunnerGroup(): BelongsTo
+    {
+        return $this->belongsTo(RunnerGroup::class, 'preferred_runner_group_id');
     }
 
     protected function lastRunSucceeded(): Attribute

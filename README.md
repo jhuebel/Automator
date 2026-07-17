@@ -95,7 +95,7 @@ Automator/
 │   │   ├── Events/                 # Broadcast events (script output, AI tokens, job assignment)
 │   │   ├── Jobs/                   # StreamClaudeCompletionJob, BroadcastDelayedEvent
 │   │   ├── Http/Controllers/Api/   # RunnerController (register/heartbeat/output/finish)
-│   │   ├── Livewire/Settings/      # UserManagement, RunnerManagement, SystemStatus, AuditLogViewer
+│   │   ├── Livewire/Settings/      # UserManagement, RunnerManagement, RunnerGroupManagement, SystemStatus, AuditLogViewer
 │   │   ├── Models/                 # ScriptDefinition, ScheduledJob, ScriptExecutionResult, Runner, AuditLog, AppSetting, User
 │   │   ├── Services/               # DependencyCheckService, RunnerAssignmentService
 │   │   └── Console/Commands/       # DispatchDueJobs (scheduler tick), SweepOfflineRunners, GenerateRunnerToken

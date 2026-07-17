@@ -97,6 +97,7 @@
                                         <p><span class="text-gray-400">Runner ID:</span> <span class="font-mono">{{ $runner->id }}</span></p>
                                         <p><span class="text-gray-400">Max concurrent jobs:</span> {{ $runner->max_concurrent_jobs }}</p>
                                         <p><span class="text-gray-400">Registered:</span> {{ $runner->created_at?->diffForHumans() ?? '—' }}</p>
+                                        <p><span class="text-gray-400">Groups:</span> {{ $runner->groups->pluck('name')->join(', ') ?: '—' }}</p>
                                         <p>
                                             <span class="text-gray-400">Runner version:</span> {{ $runner->version ?? '—' }}
                                             @if ($update = $this->availableUpdateFor($runner))

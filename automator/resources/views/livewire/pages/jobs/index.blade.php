@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Runner;
+use App\Models\RunnerGroup;
 use App\Models\ScheduledJob;
 use App\Models\ScriptDefinition;
 use Livewire\Attributes\Computed;
@@ -37,7 +38,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
     #[Computed]
     public function jobs()
     {
-        return ScheduledJob::with('script', 'preferredRunner')->orderBy('name')->get();
+        return ScheduledJob::with('script', 'preferredRunner', 'preferredRunnerGroup')->orderBy('name')->get();
     }
 
     #[Computed]
@@ -47,6 +48,16 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
 
         return Runner::orderBy('name')->get()
             ->filter(fn (Runner $runner) => ! $language || $runner->supportsLanguage($language))
+            ->values();
+    }
+
+    #[Computed]
+    public function runnerGroups()
+    {
+        $language = $this->selectedScript?->language;
+
+        return RunnerGroup::with('runners')->orderBy('name')->get()
+            ->filter(fn (RunnerGroup $group) => ! $language || $group->supportsLanguage($language))
             ->values();
     }
 
@@ -94,7 +105,11 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
         $this->name = $job->name;
         $this->scriptId = $job->script_id;
         $this->cronExpression = $job->cron_expression;
-        $this->preferredRunnerId = $job->preferred_runner_id ?? '';
+        $this->preferredRunnerId = match (true) {
+            (bool) $job->preferred_runner_id => "r:{$job->preferred_runner_id}",
+            (bool) $job->preferred_runner_group_id => "g:{$job->preferred_runner_group_id}",
+            default => '',
+        };
         $this->isEnabled = $job->is_enabled;
         $this->isEditing = true;
     }
@@ -107,6 +122,19 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
     public function applyPreset(string $cron): void
     {
         $this->cronExpression = $cron;
+    }
+
+    /**
+     * The runner picker's value is discriminated: '' = Auto, 'r:<id>' = a
+     * specific runner, 'g:<id>' = a runner group. Returns [runnerId, groupId].
+     */
+    private function parseRunnerTarget(string $value): array
+    {
+        return match (true) {
+            str_starts_with($value, 'r:') => [substr($value, 2), null],
+            str_starts_with($value, 'g:') => [null, substr($value, 2)],
+            default => [null, null],
+        };
     }
 
     public function updatedScriptId(): void
@@ -133,12 +161,22 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
             return;
         }
 
-        if (filled($this->preferredRunnerId)) {
-            $script = ScriptDefinition::find($validated['scriptId']);
-            $runner = Runner::find($this->preferredRunnerId);
+        [$runnerId, $groupId] = $this->parseRunnerTarget($this->preferredRunnerId);
+        $script = ScriptDefinition::find($validated['scriptId']);
+
+        if ($runnerId) {
+            $runner = Runner::find($runnerId);
 
             if (! $runner || ! $runner->supportsLanguage($script->language)) {
                 $this->addError('preferredRunnerId', 'That runner does not report '.$script->language->label().' as available.');
+
+                return;
+            }
+        } elseif ($groupId) {
+            $group = RunnerGroup::with('runners')->find($groupId);
+
+            if (! $group || ! $group->supportsLanguage($script->language)) {
+                $this->addError('preferredRunnerId', 'That runner group does not have a member that reports '.$script->language->label().' as available.');
 
                 return;
             }
@@ -148,7 +186,8 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
             'name' => $validated['name'],
             'script_id' => $validated['scriptId'],
             'cron_expression' => $validated['cronExpression'],
-            'preferred_runner_id' => filled($this->preferredRunnerId) ? $this->preferredRunnerId : null,
+            'preferred_runner_id' => $runnerId,
+            'preferred_runner_group_id' => $groupId,
             'is_enabled' => $this->isEnabled,
         ];
 
@@ -258,9 +297,20 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                 <label class="block text-sm font-medium text-gray-700">Runner</label>
                 <select wire:model="preferredRunnerId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm">
                     <option value="">Auto (any online runner)</option>
-                    @foreach ($this->runners as $runner)
-                        <option value="{{ $runner->id }}">{{ $runner->name }} ({{ ucfirst($runner->status) }})</option>
-                    @endforeach
+                    @if ($this->runnerGroups->isNotEmpty())
+                        <optgroup label="Runner Groups">
+                            @foreach ($this->runnerGroups as $group)
+                                <option value="g:{{ $group->id }}">{{ $group->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
+                    @if ($this->runners->isNotEmpty())
+                        <optgroup label="Individual Runners">
+                            @foreach ($this->runners as $runner)
+                                <option value="r:{{ $runner->id }}">{{ $runner->name }} ({{ ucfirst($runner->status) }})</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
                 </select>
                 <p class="text-xs text-gray-500 mt-1">Only runners that report the selected script's language as available are listed. Pin this job to a specific runner, or leave on Auto to use the least-busy online runner.</p>
                 @if ($this->selectedScript && $this->runners->isEmpty())
@@ -303,7 +353,9 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                         <td class="px-4 py-2 font-medium text-gray-900">{{ $job->name }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $job->script?->name ?? '—' }}</td>
                         <td class="px-4 py-2 text-gray-500 font-mono text-xs">{{ $job->cron_expression }}</td>
-                        <td class="px-4 py-2 text-gray-500">{{ $job->preferredRunner?->name ?? 'Auto' }}</td>
+                        <td class="px-4 py-2 text-gray-500">
+                            {{ $job->preferredRunnerGroup ? "Group: {$job->preferredRunnerGroup->name}" : ($job->preferredRunner?->name ?? 'Auto') }}
+                        </td>
                         <td class="px-4 py-2 text-gray-500">{{ $job->next_run_at?->diffForHumans() ?? '—' }}</td>
                         <td class="px-4 py-2 text-gray-500">
                             @if ($job->last_run_at)

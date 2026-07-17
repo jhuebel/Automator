@@ -16,6 +16,7 @@ ScriptDefinition ──< ScheduledJob (script_id, cascadeOnDelete)
 
 Runner ──< ScriptExecutionResult (runner_id)
 Runner ──1 personal_access_tokens (via Sanctum HasApiTokens)
+Runner }o--o{ RunnerGroup (runner_group_runner pivot — many-to-many)
 
 RunnerEnrollmentToken (standalone; consumed once by RunnerController::register())
 RunnerRelease (standalone; offered to runners via the heartbeat response, see RUNNER_PROTOCOL.md#5-self-update)
@@ -71,6 +72,7 @@ Model accessors: `isRunning` (`completed_at === null`), `isSuccess` (`exit_code 
 | `is_enabled` | boolean | |
 | `required_runner_tags` | json, nullable | superset-match against a runner's `tags`; null/empty = any online runner with capacity. Not currently exposed in the UI — superseded in practice by `preferred_runner_id` below, but still honored if set directly |
 | `preferred_runner_id` | ulid, FK → `runners`, nullable, `nullOnDelete` | pin this job to one specific runner (set from the Scheduled Jobs UI); when set, `RunnerAssignmentService::assign()` ignores `required_runner_tags` entirely and uses this runner if it's online with spare capacity, or fails the run with a clear "selected runner is offline or at capacity" message otherwise. Null/empty means auto-assign (least-busy online runner) |
+| `preferred_runner_group_id` | ulid, FK → `runner_groups`, nullable, `nullOnDelete` | pin this job to a runner group instead of a single runner; mutually exclusive with `preferred_runner_id` (the UI writes exactly one, nulling the other). `RunnerAssignmentService::assign()` picks the least-busy eligible member of the group — still honoring `required_runner_tags`, since targeting a group is a scoped auto-pick rather than an explicit single-runner override. Deleting the group nulls this column, so the job falls back to Auto |
 | `last_run_at` / `next_run_at` | timestamp, nullable | `next_run_at` indexed — `DispatchDueJobs` queries on it |
 | `last_exit_code` | integer, nullable | |
 | `current_execution_id` | ulid, nullable | the in-flight execution, if any; used to skip overlapping runs and to reconcile completion on the next scheduler tick |
@@ -107,6 +109,28 @@ authenticates as its own Sanctum-guarded principal — see
 | `expires_at` | timestamp | default TTL 60 minutes (`RunnerEnrollmentToken::issue()`) |
 | `used_at` | timestamp, nullable | enforces single-use — `redeem()` requires `whereNull('used_at')` |
 | `created_by` | FK → `users`, nullable, `nullOnDelete` | null when issued via `php artisan automator:generate-runner-token` (unattended install) rather than the Settings UI |
+
+### `runner_groups`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `name` | string, unique | operator-chosen, e.g. `"us-east"` or `"shared-terraform"` |
+| `description` | text, nullable | free-form, e.g. what region/resources this group is near |
+
+Managed from Settings → Runner Groups (`App\Livewire\Settings\RunnerGroupManagement`). A group's
+eligibility for a language or set of required tags is the **union** across its members —
+`RunnerGroup::supportsLanguage()`/`satisfiesTags()` return true if *any* member runner qualifies,
+since an execution still ultimately runs on one concrete runner
+(`RunnerAssignmentService::pickFromGroup()` then picks the least-busy eligible member). This is
+purely a management-plane concept — the Go runner is never told about group membership.
+
+### `runner_group_runner`
+
+Pivot table for the many-to-many `Runner` ⟷ `RunnerGroup` relationship (a runner may belong to
+several groups, e.g. a host serving both a region and a shared pool). No surrogate key — composite
+primary key on `(runner_group_id, runner_id)`, both `cascadeOnDelete()` so deleting either side
+cleans up membership automatically. No timestamps; membership doesn't need a history.
 
 ### `runner_releases`
 

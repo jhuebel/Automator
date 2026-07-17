@@ -39,19 +39,25 @@ WebSocket broadcasting server.
 1. A Livewire component (`pages/runner/index.blade.php`) creates a `ScriptExecutionResult`
    row and calls `RunnerAssignmentService::assign()`, optionally passing a specific runner
    the user picked from the "Run" panel's runner dropdown (defaults to "Auto").
-2. `RunnerAssignmentService` either uses that explicit runner (if given — this bypasses
-   tag matching entirely) or picks the least-busy online `Runner` whose tags satisfy any
-   required tags (`Runner::satisfiesTags()`). Either way, the runner must also report the
-   script's language as available in its last heartbeat (`Runner::supportsLanguage()`) —
-   a runner isn't eligible for a language it doesn't have installed, whether picked
-   automatically or explicitly. Eligible runners increment `current_job_count` and get
-   `runner_id` stamped on the execution. If no eligible runner exists (offline, at
-   capacity, missing tags, or missing the language), the execution is immediately marked
-   failed (`exit_code = -1`) with a message naming the specific reason — there is no
-   queueing-and-waiting and no silent retry. Scheduled jobs can likewise be pinned to a
-   specific runner via `ScheduledJob.preferred_runner_id`, set from the Scheduled Jobs UI;
-   both the Run Script and Scheduled Jobs runner-picker dropdowns only list
-   language-capable runners in the first place.
+2. `RunnerAssignmentService` picks a runner one of three ways, in priority order: an explicit
+   runner (if given — this bypasses tag matching entirely); otherwise a runner group (if
+   given — picks the least-busy eligible *member* of that group, still honoring required
+   tags, since targeting a group is a scoped auto-pick rather than an explicit override);
+   otherwise the least-busy online `Runner` fleet-wide whose tags satisfy any required tags
+   (`Runner::satisfiesTags()`). In every case the runner must also report the script's
+   language as available in its last heartbeat (`Runner::supportsLanguage()`) — a runner
+   isn't eligible for a language it doesn't have installed, whichever way it was picked. A
+   *group's* eligibility for a language/tag requirement is the union of its members'
+   (`RunnerGroup::supportsLanguage()`/`satisfiesTags()` — true if *any* member qualifies),
+   since one execution always ends up running on a single concrete runner. Eligible runners
+   increment `current_job_count` and get `runner_id` stamped on the execution. If no eligible
+   runner exists (offline, at capacity, missing tags, or missing the language), the execution
+   is immediately marked failed (`exit_code = -1`) with a message naming the specific reason
+   — there is no queueing-and-waiting and no silent retry. Scheduled jobs can likewise be
+   pinned to a specific runner (`ScheduledJob.preferred_runner_id`) or a runner group
+   (`ScheduledJob.preferred_runner_group_id`, mutually exclusive with the former), set from
+   the Scheduled Jobs UI; the Run Script and Scheduled Jobs runner-picker dropdowns list both
+   individual runners and groups, filtered to language-capable ones.
 3. A `JobAssigned` event is broadcast on that runner's private Reverb channel
    (`runner.{runnerId}`), delayed ~600ms via `BroadcastDelayedEvent` (a `ShouldQueue`
    wrapper) so the browser's own Echo subscription — established once the Livewire
