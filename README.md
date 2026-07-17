@@ -2,6 +2,19 @@
 
 A web application for managing and automating IaaS scripts. Built with Laravel, Livewire, and Reverb, it runs on any Linux distribution with PHP 8.3+.
 
+## Screenshots
+
+| | |
+|---|---|
+| **Dashboard** — execution stats, 14-day activity chart, language breakdown | **Script Library** — searchable, taggable script catalog |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Script Library](docs/screenshots/script-library.png) |
+| **Script Editor** — CodeMirror with syntax highlighting and an AI assistant panel | **Run Script** — live output streaming with real ANSI color rendering |
+| ![Script Editor](docs/screenshots/script-editor.png) | ![Run Script](docs/screenshots/run-script.png) |
+| **History** — every run, its runner, duration, and exit code | **Scheduled Jobs** — cron-based scheduling pinned to a specific runner |
+| ![History](docs/screenshots/history.png) | ![Scheduled Jobs](docs/screenshots/scheduled-jobs.png) |
+| **Settings → Runners** — fleet health, per-language support, and self-update | |
+| ![Settings - Runners](docs/screenshots/settings-runners.png) | |
+
 ## Features
 
 - **Script Library** — store, organize, and search Bash, PowerShell, Python, Ansible, and Terraform scripts
