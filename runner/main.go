@@ -19,6 +19,8 @@ func main() {
 		runDaemon(os.Args[2:])
 	case "unregister":
 		runUnregister(os.Args[2:])
+	case "version":
+		fmt.Println(Version)
 	case "-h", "--help", "help":
 		printUsage()
 	default:
@@ -34,7 +36,8 @@ func printUsage() {
 Usage:
   automator-runner register --server <url> --token <token> --name <name> [--tags a,b,c]
   automator-runner run [--config path]
-  automator-runner unregister [--config path]`)
+  automator-runner unregister [--config path]
+  automator-runner version`)
 }
 
 func runUnregister(args []string) {

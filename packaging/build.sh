@@ -100,6 +100,27 @@ cp "$RUNNER_DIR/automator-runner-windows-amd64.exe" "$BUILD_DIR/runner/windows/a
 cp packaging/runner/windows/install.ps1             "$BUILD_DIR/runner/windows/"
 cp packaging/runner/windows/uninstall.ps1           "$BUILD_DIR/runner/windows/"
 
+# ---------------------------------------------------------------------------
+# Publish both binaries to the management plane as draft releases. This
+# never makes them live to the fleet by itself — that requires a separate,
+# deliberate `automator:release-runner-binary` run (see docs/RUNNER_PROTOCOL.md).
+# Best-effort: skipped if the app isn't set up yet (e.g. a fresh checkout
+# with no configured database), since publishing isn't required to produce
+# the distributable archive.
+# ---------------------------------------------------------------------------
+RUNNER_VERSION=$(grep -oP 'const Version = "\K[^"]+' "$RUNNER_DIR/version.go" 2>/dev/null) || true
+if [ -n "$RUNNER_VERSION" ]; then
+    info "Publishing automator-runner v${RUNNER_VERSION} to the management plane..."
+    pushd "$APP_DIR" >/dev/null
+    php artisan automator:publish-runner-binary "../$RUNNER_DIR/automator-runner-linux-amd64" --os=linux --arch=amd64 --runner-version="$RUNNER_VERSION" || \
+        info "  (skipped — publish failed, likely no configured database yet)"
+    php artisan automator:publish-runner-binary "../$RUNNER_DIR/automator-runner-windows-amd64.exe" --os=windows --arch=amd64 --runner-version="$RUNNER_VERSION" || \
+        info "  (skipped — publish failed, likely no configured database yet)"
+    popd >/dev/null
+else
+    info "Could not determine runner version — skipping publish."
+fi
+
 rm -f "$RUNNER_DIR/automator-runner-linux-amd64" "$RUNNER_DIR/automator-runner-windows-amd64.exe"
 
 ARCHIVE="$OUTDIR/automator-${VERSION}-linux-x64.tar.gz"

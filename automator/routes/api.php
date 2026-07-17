@@ -11,5 +11,6 @@ Route::prefix('runner')->group(function () {
         Route::post('unregister', [RunnerController::class, 'unregister']);
         Route::post('executions/{execution}/output', [RunnerController::class, 'output']);
         Route::post('executions/{execution}/finish', [RunnerController::class, 'finish']);
+        Route::get('releases/{release}/download', [RunnerController::class, 'downloadRelease'])->name('api.runner.releases.download');
     });
 });

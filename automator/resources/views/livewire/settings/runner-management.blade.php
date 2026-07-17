@@ -1,4 +1,15 @@
 <div class="space-y-4">
+    <div class="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between">
+        <div>
+            <h3 class="text-sm font-semibold text-gray-900">Automatically offer runner updates</h3>
+            <p class="text-xs text-gray-500 mt-0.5">When on, runners are told about newer released builds on their next heartbeat and update themselves between jobs.</p>
+        </div>
+        <label class="inline-flex items-center gap-2">
+            <input type="checkbox" wire:click="toggleAutoUpdate" @checked($autoUpdateEnabled) class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+            <span class="text-sm text-gray-600">Enabled</span>
+        </label>
+    </div>
+
     <div class="flex justify-end">
         <button wire:click="generateToken" class="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-700">
             + Generate Enrollment Token
@@ -86,7 +97,12 @@
                                         <p><span class="text-gray-400">Runner ID:</span> <span class="font-mono">{{ $runner->id }}</span></p>
                                         <p><span class="text-gray-400">Max concurrent jobs:</span> {{ $runner->max_concurrent_jobs }}</p>
                                         <p><span class="text-gray-400">Registered:</span> {{ $runner->created_at?->diffForHumans() ?? '—' }}</p>
-                                        <p><span class="text-gray-400">Runner version:</span> {{ $runner->version ?? '—' }}</p>
+                                        <p>
+                                            <span class="text-gray-400">Runner version:</span> {{ $runner->version ?? '—' }}
+                                            @if ($update = $this->availableUpdateFor($runner))
+                                                <span class="text-amber-600">(update to {{ $update->version }} available)</span>
+                                            @endif
+                                        </p>
                                         <p><span class="text-gray-400">Architecture:</span> {{ $runner->arch ?? '—' }}</p>
                                         <p>
                                             <span class="text-gray-400">Disk space:</span>

@@ -136,8 +136,16 @@ type heartbeatInfo struct {
 	DiskTotalBytes uint64 `json:"disk_total_bytes"`
 }
 
-func (c *apiClient) heartbeat(runtimes []RuntimeCheck, info heartbeatInfo) error {
-	_, status, err := c.post("/api/runner/heartbeat", map[string]any{
+type heartbeatResponse struct {
+	Status string      `json:"status"`
+	Update *updateInfo `json:"update"`
+}
+
+// heartbeat returns the "update" field from the response, if the management
+// plane included one — nil in the common case (auto-update off, no eligible
+// release, or this runner is already current).
+func (c *apiClient) heartbeat(runtimes []RuntimeCheck, info heartbeatInfo) (*updateInfo, error) {
+	body, status, err := c.post("/api/runner/heartbeat", map[string]any{
 		"runtimes":         runtimes,
 		"version":          info.Version,
 		"arch":             info.Arch,
@@ -145,12 +153,46 @@ func (c *apiClient) heartbeat(runtimes []RuntimeCheck, info heartbeatInfo) error
 		"disk_total_bytes": info.DiskTotalBytes,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if status != 200 {
-		return fmt.Errorf("heartbeat failed (HTTP %d)", status)
+		return nil, fmt.Errorf("heartbeat failed (HTTP %d)", status)
 	}
-	return nil
+
+	var resp heartbeatResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, err
+	}
+
+	return resp.Update, nil
+}
+
+// downloadRelease fetches a runner binary from a fully-qualified URL (as
+// given by a heartbeat response's update.download_url) using the same
+// bearer token as every other authenticated call. Uses its own client with
+// a longer timeout than c.http's 15s, since a binary download can
+// legitimately take longer than the other, tiny JSON exchanges.
+func (c *apiClient) downloadRelease(url string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("download failed (HTTP %d)", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 func (c *apiClient) unregister() error {

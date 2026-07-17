@@ -144,6 +144,7 @@ All under `auth:sanctum` middleware except `register`.
 | `POST /api/runner/unregister` | Self-revoke: deletes the runner's own token and `Runner` row | none |
 | `POST /api/runner/executions/{execution}/output` | Stream output lines | `{"lines": [{"text", "is_error", "timestamp"}, ...]}` |
 | `POST /api/runner/executions/{execution}/finish` | Report completion | `{"exit_code": <int>}` |
+| `GET /api/runner/releases/{release}/download` | Download a runner binary update | none — see [Self-update](#5-self-update) |
 
 Every one of these also calls `Runner::markSeen()` (sets `last_seen_at = now()`,
 `status = 'online'`), so any authenticated traffic — not just the dedicated heartbeat —
@@ -201,6 +202,68 @@ error, timeout) rather than a real process exit code.
 4. The runner reports the outcome through the *same* `.../finish` call as any other
    completion — there's no separate "cancelled" status; a cancelled run just shows up
    with whatever exit code the killed process (or the runner's own `-1`) produced.
+
+## 5. Self-update
+
+The management plane can track newer `automator-runner` builds and offer them to the
+fleet through the same heartbeat channel used for liveness — no separate polling loop.
+
+**Publishing and releasing a build** are deliberately two separate, CLI-driven steps:
+
+1. `php artisan automator:publish-runner-binary <path> --os=<linux|windows> --arch=amd64
+   --runner-version=<version>` — computes a sha256 checksum, copies the binary into private
+   storage, and creates/updates a `runner_releases` row with `is_released = false`.
+   `packaging/build.sh` calls this automatically for both cross-compiled binaries after
+   every build, using the version baked into `runner/version.go` (the build host can't
+   `exec()` the Windows `.exe` to ask it directly, so the version is passed in rather
+   than shelled out for).
+2. `php artisan automator:release-runner-binary <version> --os=<linux|windows>
+   --arch=amd64` — the *only* action that flips `is_released` to `true`. A build a runner
+   can ever be offered must have gone through this step explicitly; publishing alone
+   never makes a build live. This also means a rollback is just releasing an older
+   version again — `RunnerRelease::latestFor()` orders by `released_at`, not semver.
+
+**Discovery**: if Settings → Runners' "Automatically offer runner updates" toggle
+(`AppSetting.runner_auto_update_enabled`) is on, every heartbeat response checks
+`RunnerRelease::latestFor($runner->os, $runner->arch)` for a released build that differs
+from the version the runner just reported, and includes it:
+
+```json
+{
+  "status": "ok",
+  "update": {
+    "version": "1.3.0",
+    "checksum_sha256": "...",
+    "size_bytes": 12345678,
+    "download_url": "https://.../api/runner/releases/{id}/download"
+  }
+}
+```
+
+The `update` key is omitted entirely when the toggle is off, there's no eligible release,
+or the runner is already current — the common case stays a one-line response.
+
+**Applying the update** (`runner/update.go`), triggered whenever a heartbeat response
+includes `update`:
+
+1. Refuses if a job is currently running (`Executor.Idle()`) — retried on the next tick,
+   never interrupts an in-flight script.
+2. Downloads the binary from `download_url` with the runner's own bearer token (the same
+   credential it already uses for every other authenticated call).
+3. Verifies the downloaded bytes' sha256 against `checksum_sha256` — refuses and leaves
+   the current binary untouched on any mismatch.
+4. Replaces the running executable (`replaceExecutable`, OS-specific):
+   - **Linux**: writes to a temp file in the same directory, `chmod 0755`, then
+     `os.Rename()` over the current binary's path — safe even while this process is
+     running from that inode, since the kernel keeps it alive until exit.
+   - **Windows**: renames the running exe aside to `automator-runner.exe.old` (Windows
+     won't allow overwriting an in-use `.exe` directly, but will allow renaming one),
+     then writes the new bytes to the now-vacant path.
+5. On success, exits cleanly (`os.Exit(0)`) — no in-process re-exec. The process
+   supervisor relaunches it from the now-updated binary: `Restart=always` in the packaged
+   Linux systemd unit, and NSSM's `AppExit Default Restart` (set by
+   `packaging/runner/windows/install.ps1`) on Windows, which restarts on any exit code,
+   not just crashes.
 
 ## Timeouts
 

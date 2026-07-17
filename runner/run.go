@@ -23,7 +23,7 @@ func runDaemon(args []string) {
 	api := newAPIClient(cfg.Server, cfg.Token)
 	executor := newExecutor(api)
 
-	go heartbeatLoop(api)
+	go heartbeatLoop(api, executor)
 
 	client := newPusherClient(cfg, api, executor.RunJob, func(payload jobCancelPayload) {
 		executor.Cancel(payload.ExecutionID)
@@ -39,7 +39,7 @@ func runDaemon(args []string) {
 // shelling out to five version checks every 15s would be wasteful. Disk
 // space is re-checked on every tick, since a long-running script (or
 // several) can genuinely fill up the runner's temp directory over time.
-func heartbeatLoop(api *apiClient) {
+func heartbeatLoop(api *apiClient, executor *Executor) {
 	runtimes := detectRuntimes()
 	arch := runtime.GOARCH
 
@@ -50,8 +50,14 @@ func heartbeatLoop(api *apiClient) {
 		}
 
 		info := heartbeatInfo{Version: Version, Arch: arch, DiskFreeBytes: free, DiskTotalBytes: total}
-		if err := api.heartbeat(runtimes, info); err != nil {
+		update, err := api.heartbeat(runtimes, info)
+		if err != nil {
 			log.Printf("heartbeat failed: %v", err)
+			return
+		}
+
+		if update != nil {
+			maybeApplyUpdate(api, executor, *update)
 		}
 	}
 

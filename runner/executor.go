@@ -49,6 +49,14 @@ func (e *Executor) unregister(executionID string) {
 	e.mu.Unlock()
 }
 
+// Idle reports whether any job is currently executing — a self-update must
+// never replace the running binary out from under an in-flight script.
+func (e *Executor) Idle() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return len(e.running) == 0
+}
+
 // RunJob executes an assigned script and reports output/completion back to
 // the management plane. It never returns an error to the caller — any
 // failure is reported via the normal finish() call with a non-zero exit code,

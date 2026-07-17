@@ -3,8 +3,10 @@
 namespace App\Livewire\Settings;
 
 use App\Enums\ScriptLanguage;
+use App\Models\AppSetting;
 use App\Models\Runner;
 use App\Models\RunnerEnrollmentToken;
+use App\Models\RunnerRelease;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -16,6 +18,13 @@ class RunnerManagement extends Component
     public ?string $confirmingDeleteId = null;
 
     public ?string $expandedId = null;
+
+    public bool $autoUpdateEnabled = false;
+
+    public function mount(): void
+    {
+        $this->autoUpdateEnabled = AppSetting::current()->runner_auto_update_enabled;
+    }
 
     #[Computed]
     public function runners()
@@ -77,6 +86,30 @@ class RunnerManagement extends Component
         $runner->save();
 
         unset($this->runners);
+    }
+
+    public function toggleAutoUpdate(): void
+    {
+        $this->authorize('settings.manage');
+
+        $this->autoUpdateEnabled = ! $this->autoUpdateEnabled;
+        AppSetting::current()->update(['runner_auto_update_enabled' => $this->autoUpdateEnabled]);
+    }
+
+    /**
+     * The released build this runner could move to, if any — null if it's
+     * already current, has no eligible release, or hasn't reported an
+     * os/arch yet.
+     */
+    public function availableUpdateFor(Runner $runner): ?RunnerRelease
+    {
+        if (! $runner->os || ! $runner->arch) {
+            return null;
+        }
+
+        $release = RunnerRelease::latestFor($runner->os, $runner->arch);
+
+        return $release && $release->version !== $runner->version ? $release : null;
     }
 
     public function render()

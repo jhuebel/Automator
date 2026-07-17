@@ -13,6 +13,7 @@ class AppSetting extends Model
         'sso_auto_provision_enabled', 'sso_default_role',
         'entra_enabled', 'entra_client_id', 'entra_client_secret', 'entra_tenant_id', 'entra_allowed_domains',
         'google_enabled', 'google_client_id', 'google_client_secret', 'google_allowed_domains',
+        'runner_auto_update_enabled',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class AppSetting extends Model
             'entra_client_secret' => 'encrypted',
             'google_enabled' => 'boolean',
             'google_client_secret' => 'encrypted',
+            'runner_auto_update_enabled' => 'boolean',
         ];
     }
 

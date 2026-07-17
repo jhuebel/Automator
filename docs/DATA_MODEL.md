@@ -18,6 +18,7 @@ Runner ──< ScriptExecutionResult (runner_id)
 Runner ──1 personal_access_tokens (via Sanctum HasApiTokens)
 
 RunnerEnrollmentToken (standalone; consumed once by RunnerController::register())
+RunnerRelease (standalone; offered to runners via the heartbeat response, see RUNNER_PROTOCOL.md#5-self-update)
 
 ScheduledJob ──1 ScriptExecutionResult (current_execution_id, the in-flight run if any)
 
@@ -107,6 +108,25 @@ authenticates as its own Sanctum-guarded principal — see
 | `used_at` | timestamp, nullable | enforces single-use — `redeem()` requires `whereNull('used_at')` |
 | `created_by` | FK → `users`, nullable, `nullOnDelete` | null when issued via `php artisan automator:generate-runner-token` (unattended install) rather than the Settings UI |
 
+### `runner_releases`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | ulid, PK | |
+| `version` | string | e.g. `"1.3.0"` |
+| `os` | string | `linux` / `windows` |
+| `arch` | string | `amd64` / `arm64` |
+| `checksum_sha256` | string | computed at publish time from the binary's actual bytes |
+| `storage_path` | string | relative path on the `local` (private) disk — `runner-releases/{id}/automator-runner[.exe]` |
+| `size_bytes` | unsigned bigint | |
+| `is_released` | boolean, default `false` | the fleet-visibility gate — `automator:publish-runner-binary` always creates this `false`; only `automator:release-runner-binary` flips it `true`. A runner is never offered (and the download endpoint 404s for) an unreleased row |
+| `released_at` | timestamp, nullable | set when `is_released` flips true; `RunnerRelease::latestFor()` orders by this, not semver, so republishing an older version and releasing it is how a rollback works |
+| `created_by` | FK → `users`, nullable, `nullOnDelete` | null for CLI-published rows (the normal case — `packaging/build.sh` publishes every build automatically) |
+
+Unique on `(version, os, arch)` — republishing the same tuple overwrites the existing row
+(and resets `is_released` to `false`, requiring re-release) rather than creating a
+duplicate.
+
 ### `app_settings`
 
 Singleton table — `AppSetting::current()` calls `firstOrCreate([])`, so there is always
@@ -119,6 +139,7 @@ exactly one row (id `1`).
 | `anthropic_api_key` | text, nullable, `encrypted` cast | write-only from the UI's perspective |
 | `anthropic_model` | string, default `claude-sonnet-5` | |
 | `anthropic_effort` | string, default `high` | ignored for Haiku models, which reject the parameter |
+| `runner_auto_update_enabled` | boolean, default `false` | gates whether heartbeat responses include update info at all — see [RUNNER_PROTOCOL.md](RUNNER_PROTOCOL.md#5-self-update) |
 
 `max_concurrent_executions` existed here through v2.0.0 and was removed in v2.1.0 (see
 `2026_07_07_190000_drop_max_concurrent_executions_from_app_settings_table.php`) —

@@ -93,13 +93,14 @@ script output.
 
 ## Runners
 
-Standalone Go module (`runner/`), one binary (`automator-runner`) with three subcommands:
+Standalone Go module (`runner/`), one binary (`automator-runner`) with four subcommands:
 
 | Command | Purpose |
 |---|---|
 | `automator-runner register --server <url> --token <token> --name <n> [--tags a,b,c]` | One-time enrollment; writes a local config file |
 | `automator-runner run [--config path]` | The daemon loop: connect to Reverb, listen for jobs, execute, report |
 | `automator-runner unregister [--config path]` | Revoke its own token and remove itself from the registry |
+| `automator-runner version` | Print the compiled-in version and exit — standalone debugging aid |
 
 | File | Responsibility |
 |---|---|
@@ -111,7 +112,9 @@ Standalone Go module (`runner/`), one binary (`automator-runner`) with three sub
 | `runtimes.go` | Detects installed script runtimes (`bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`) at startup, reported with every heartbeat |
 | `version.go` | The runner binary's own `Version` const, bumped when shipping a runner-side change worth telling apart in the fleet |
 | `diskspace_linux.go` / `diskspace_windows.go` | `diskSpace()` — free/total bytes on the filesystem backing `os.TempDir()`, re-checked every heartbeat tick |
-| `executor.go` | Subprocess execution, output streaming/batching, timeout enforcement, cancellation bookkeeping |
+| `update.go` | `maybeApplyUpdate()` — downloads, checksum-verifies, and applies a newer binary advertised in a heartbeat response, then exits for the process supervisor to relaunch it |
+| `update_linux.go` / `update_windows.go` | `replaceExecutable()` — OS-specific in-place binary replacement (atomic rename on Linux; rename-aside-then-write on Windows, which can't overwrite a running `.exe`) |
+| `executor.go` | Subprocess execution, output streaming/batching, timeout enforcement, cancellation bookkeeping; also `Idle()`, checked before applying a self-update so one never interrupts a running job |
 | `language.go` | Maps a script language to its OS-specific command (mirrors `ScriptLanguage::commandFor()` on the Laravel side, using `runtime.GOOS` instead of `PHP_OS_FAMILY`) |
 | `reporter.go` | Batches output lines (~250ms flush cadence) before POSTing them |
 | `process_linux.go` / `process_windows.go` | `prepareProcess()` — Windows starts the child in its own process group (`CREATE_NEW_PROCESS_GROUP`) so it can be signaled independently |

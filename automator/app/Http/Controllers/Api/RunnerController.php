@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Events\ScriptExecutionFinished;
 use App\Events\ScriptOutputReceived;
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Runner;
 use App\Models\RunnerEnrollmentToken;
+use App\Models\RunnerRelease;
 use App\Models\ScriptExecutionResult;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class RunnerController extends Controller
@@ -99,7 +102,33 @@ class RunnerController extends Controller
 
         $runner->markSeen();
 
-        return response()->json(['status' => 'ok']);
+        $response = ['status' => 'ok'];
+
+        if (AppSetting::current()->runner_auto_update_enabled && $runner->os && $runner->arch) {
+            $release = RunnerRelease::latestFor($runner->os, $runner->arch);
+
+            if ($release && $release->version !== $runner->version) {
+                $response['update'] = [
+                    'version' => $release->version,
+                    'checksum_sha256' => $release->checksum_sha256,
+                    'size_bytes' => $release->size_bytes,
+                    'download_url' => route('api.runner.releases.download', $release),
+                ];
+            }
+        }
+
+        return response()->json($response);
+    }
+
+    public function downloadRelease(Request $request, RunnerRelease $release)
+    {
+        abort_unless($release->is_released, 404);
+
+        return Storage::disk('local')->download(
+            $release->storage_path,
+            basename($release->storage_path),
+            ['X-Checksum-Sha256' => $release->checksum_sha256]
+        );
     }
 
     public function output(Request $request, ScriptExecutionResult $execution)
