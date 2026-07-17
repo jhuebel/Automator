@@ -126,9 +126,23 @@ func (c *apiClient) authorizeChannel(channelName, socketID string) (string, erro
 	return out.Auth, nil
 }
 
-func (c *apiClient) heartbeat(runtimes []RuntimeCheck) error {
+// heartbeatInfo is the runner-identity portion of a heartbeat — separate
+// from RuntimeCheck (language availability) since these describe the
+// runner's own build/host rather than what it can execute.
+type heartbeatInfo struct {
+	Version        string `json:"version"`
+	Arch           string `json:"arch"`
+	DiskFreeBytes  uint64 `json:"disk_free_bytes"`
+	DiskTotalBytes uint64 `json:"disk_total_bytes"`
+}
+
+func (c *apiClient) heartbeat(runtimes []RuntimeCheck, info heartbeatInfo) error {
 	_, status, err := c.post("/api/runner/heartbeat", map[string]any{
-		"runtimes": runtimes,
+		"runtimes":         runtimes,
+		"version":          info.Version,
+		"arch":             info.Arch,
+		"disk_free_bytes":  info.DiskFreeBytes,
+		"disk_total_bytes": info.DiskTotalBytes,
 	})
 	if err != nil {
 		return err

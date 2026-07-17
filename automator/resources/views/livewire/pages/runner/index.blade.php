@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Runner;
 use App\Models\ScriptDefinition;
 use App\Models\ScriptExecutionResult;
 use App\Services\RunnerAssignmentService;
@@ -17,6 +18,8 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
     public string $search = '';
 
     public array $variableValues = [];
+
+    public string $runnerId = '';
 
     public ?string $executionId = null;
 
@@ -46,13 +49,33 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
         return $this->scriptId ? ScriptDefinition::find($this->scriptId) : null;
     }
 
+    #[Computed]
+    public function onlineRunners()
+    {
+        $language = $this->selectedScript?->language;
+
+        return Runner::where('status', 'online')->orderBy('name')->get()
+            ->filter(fn (Runner $runner) => ! $language || $runner->supportsLanguage($language))
+            ->values();
+    }
+
     public function selectScript(string $id): void
     {
         $this->scriptId = $id;
+        $this->runnerId = '';
         $this->executionId = null;
         $this->exitCode = null;
         $this->isRunning = false;
         $this->populateDefaults();
+
+        // The terminal's output lines live in the scriptTerminal Alpine
+        // component (resources/js/script-terminal.js), not in this Livewire
+        // component's state — it's marked wire:ignore so per-line output
+        // events don't trigger full Livewire re-renders. That div survives
+        // a script switch untouched, so it needs an explicit signal to
+        // clear itself; otherwise the previous script's output just sits
+        // there under the newly-selected script.
+        $this->dispatch('script-selected');
     }
 
     private function populateDefaults(): void
@@ -87,7 +110,7 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
             'output' => [],
         ]);
 
-        app(RunnerAssignmentService::class)->assign($result);
+        app(RunnerAssignmentService::class)->assign($result, null, filled($this->runnerId) ? $this->runnerId : null);
 
         $this->executionId = $result->id;
         $this->exitCode = null;
@@ -136,15 +159,23 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
         </div>
     </div>
 
-    <div class="lg:col-span-3 space-y-4">
+    <div class="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
         @if ($this->selectedScript)
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex-shrink-0">
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="font-semibold text-gray-900">{{ $this->selectedScript->name }}</h2>
                         <p class="text-sm text-gray-500">{{ $this->selectedScript->description }}</p>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-2">
+                        @unless ($isRunning)
+                            <select wire:model="runnerId" class="rounded-md border-gray-300 shadow-sm text-sm">
+                                <option value="">Auto (least busy)</option>
+                                @foreach ($this->onlineRunners as $runner)
+                                    <option value="{{ $runner->id }}">{{ $runner->name }}</option>
+                                @endforeach
+                            </select>
+                        @endunless
                         @if ($isRunning)
                             <button wire:click="cancel" class="px-4 py-2 text-sm bg-red-600 text-white rounded-md">Cancel</button>
                         @else
@@ -154,6 +185,12 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
                 </div>
 
                 @error('run') <p class="text-sm text-red-600 mt-2">{{ $message }}</p> @enderror
+
+                @if ($this->onlineRunners->isEmpty())
+                    <p class="text-sm text-amber-600 mt-2">
+                        No online runner currently reports {{ $this->selectedScript->language->label() }} as available — running this script will fail.
+                    </p>
+                @endif
 
                 @if (! empty($this->selectedScript->variables))
                     <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -197,13 +234,14 @@ new #[Layout('layouts.app', ['title' => 'Run Script'])] class extends Component
                 x-data="scriptTerminal()"
                 x-init="init()"
                 x-on:execution-started.window="subscribe($event.detail.executionId)"
+                x-on:script-selected.window="clear()"
                 x-on:destroy="destroy()"
                 wire:ignore
-                class="bg-gray-900 rounded-lg shadow-sm border border-gray-800 p-4 font-mono text-xs text-gray-100 h-96 overflow-y-auto"
+                class="bg-gray-900 rounded-lg shadow-sm border border-gray-800 p-4 font-mono text-xs text-gray-100 flex-1 min-h-0 overflow-y-auto"
                 x-ref="output"
             >
                 <template x-for="(line, i) in lines" :key="i">
-                    <div :class="line.isError ? 'text-red-400' : 'text-gray-200'" x-text="line.text"></div>
+                    <div class="whitespace-pre" :class="line.isError ? 'text-red-400' : 'text-gray-200'" x-html="line.html"></div>
                 </template>
                 <div x-show="lines.length === 0" class="text-gray-500">No output yet.</div>
             </div>

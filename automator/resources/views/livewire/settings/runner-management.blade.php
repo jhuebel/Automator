@@ -21,10 +21,12 @@
         <table class="min-w-full text-sm divide-y divide-gray-100">
             <thead class="bg-gray-50">
                 <tr class="text-left text-gray-500">
+                    <th class="px-4 py-2"></th>
                     <th class="px-4 py-2">Name</th>
                     <th class="px-4 py-2">Host</th>
                     <th class="px-4 py-2">OS</th>
                     <th class="px-4 py-2">Tags</th>
+                    <th class="px-4 py-2">Languages</th>
                     <th class="px-4 py-2">Status</th>
                     <th class="px-4 py-2">Jobs</th>
                     <th class="px-4 py-2">Last Seen</th>
@@ -33,7 +35,10 @@
             </thead>
             <tbody class="divide-y divide-gray-50">
                 @forelse ($this->runners as $runner)
-                    <tr wire:key="runner-{{ $runner->id }}">
+                    <tr wire:key="runner-{{ $runner->id }}" class="hover:bg-gray-50 cursor-pointer" wire:click="toggleExpand('{{ $runner->id }}')">
+                        <td class="px-4 py-2 text-gray-400">
+                            <span class="inline-block transition-transform {{ $expandedId === $runner->id ? 'rotate-90' : '' }}">&#9656;</span>
+                        </td>
                         <td class="px-4 py-2 font-medium text-gray-900">{{ $runner->name }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $runner->hostname ?? '—' }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $runner->os ?? '—' }}</td>
@@ -41,6 +46,18 @@
                             @foreach ($runner->tags as $tag)
                                 <span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{{ $tag }}</span>
                             @endforeach
+                        </td>
+                        <td class="px-4 py-2">
+                            <div class="flex flex-wrap gap-1">
+                                @foreach ($this->languages as $language)
+                                    <span
+                                        title="{{ $language->label() }}"
+                                        class="text-xs px-1.5 py-0.5 rounded {{ $runner->supportsLanguage($language) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-400' }}"
+                                    >
+                                        {{ $language->label() }}
+                                    </span>
+                                @endforeach
+                            </div>
                         </td>
                         <td class="px-4 py-2">
                             <span class="text-xs px-2 py-0.5 rounded
@@ -54,16 +71,70 @@
                         </td>
                         <td class="px-4 py-2 text-gray-500">{{ $runner->current_job_count }}/{{ $runner->max_concurrent_jobs }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $runner->last_seen_at?->diffForHumans() ?? '—' }}</td>
-                        <td class="px-4 py-2 space-x-2 whitespace-nowrap">
+                        <td class="px-4 py-2 space-x-2 whitespace-nowrap" wire:click.stop>
                             <button wire:click="toggleDisabled('{{ $runner->id }}')" class="text-gray-600 hover:text-gray-900">
                                 {{ $runner->status === 'disabled' ? 'Enable' : 'Disable' }}
                             </button>
                             <button wire:click="confirmDelete('{{ $runner->id }}')" class="text-red-600 hover:text-red-800">Delete</button>
                         </td>
                     </tr>
+                    @if ($expandedId === $runner->id)
+                        <tr wire:key="runner-detail-{{ $runner->id }}">
+                            <td colspan="10" class="px-4 py-3 bg-gray-50">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="text-xs text-gray-600 space-y-1">
+                                        <p><span class="text-gray-400">Runner ID:</span> <span class="font-mono">{{ $runner->id }}</span></p>
+                                        <p><span class="text-gray-400">Max concurrent jobs:</span> {{ $runner->max_concurrent_jobs }}</p>
+                                        <p><span class="text-gray-400">Registered:</span> {{ $runner->created_at?->diffForHumans() ?? '—' }}</p>
+                                        <p><span class="text-gray-400">Runner version:</span> {{ $runner->version ?? '—' }}</p>
+                                        <p><span class="text-gray-400">Architecture:</span> {{ $runner->arch ?? '—' }}</p>
+                                        <p>
+                                            <span class="text-gray-400">Disk space:</span>
+                                            @if ($runner->disk_total_bytes)
+                                                @php
+                                                    $freePercent = round(($runner->disk_free_bytes / $runner->disk_total_bytes) * 100);
+                                                @endphp
+                                                <span class="{{ $freePercent < 10 ? 'text-red-600 font-medium' : '' }}">
+                                                    {{ \Illuminate\Support\Number::fileSize($runner->disk_free_bytes, precision: 1) }}
+                                                    free of {{ \Illuminate\Support\Number::fileSize($runner->disk_total_bytes, precision: 1) }}
+                                                    ({{ $freePercent }}%)
+                                                </span>
+                                            @else
+                                                —
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-medium text-gray-500 mb-1">Runtimes reported in last heartbeat</p>
+                                        @if (empty($runner->runtimes))
+                                            <p class="text-xs text-gray-400">No heartbeat received yet.</p>
+                                        @else
+                                            <table class="w-full text-xs">
+                                                <tbody class="divide-y divide-gray-200">
+                                                    @foreach ($runner->runtimes as $runtime)
+                                                        <tr>
+                                                            <td class="py-1 pr-2 font-medium text-gray-700">{{ $runtime['name'] }}</td>
+                                                            <td class="py-1 pr-2 text-gray-400">{{ $runtime['description'] ?? '' }}</td>
+                                                            <td class="py-1">
+                                                                @if ($runtime['available'] ?? false)
+                                                                    <span class="text-green-600">&check; {{ $runtime['version'] ?? '' }}</span>
+                                                                @else
+                                                                    <span class="text-gray-400">{{ $runtime['error'] ?? 'Not available' }}</span>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-6 text-center text-gray-500">No runners registered yet.</td>
+                        <td colspan="10" class="px-4 py-6 text-center text-gray-500">No runners registered yet.</td>
                     </tr>
                 @endforelse
             </tbody>

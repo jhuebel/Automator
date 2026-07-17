@@ -132,7 +132,17 @@ func (e *Executor) run(executionID string, args []string, dir string, env map[st
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	// Resolve through the same lookup used for heartbeat runtime detection
+	// (findExecutable in runtimes.go) so "available" and "actually runs"
+	// agree — a bare command name here would silently fail to find an
+	// interpreter that's only reachable via one of the extra search dirs,
+	// not the process's own PATH.
+	command := args[0]
+	if resolved := findExecutable(command); resolved != "" {
+		command = resolved
+	}
+
+	cmd := exec.CommandContext(ctx, command, args[1:]...)
 	if dir != "" {
 		cmd.Dir = dir
 	}

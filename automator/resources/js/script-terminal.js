@@ -1,3 +1,5 @@
+import { ansiToHtml } from './ansi';
+
 /**
  * Alpine component that subscribes to a private Reverb channel for a running
  * script execution and renders output lines directly in the DOM, bypassing
@@ -23,7 +25,7 @@ export default function scriptTerminal() {
 
             window.Echo.private(this.channelName)
                 .listen('.output-line', (e) => {
-                    this.lines.push(e);
+                    this.lines.push({ ...e, html: ansiToHtml(e.text) });
                 })
                 .listen('.finished', (e) => {
                     this.$wire.call('markFinished', e.exitCode);
@@ -36,6 +38,17 @@ export default function scriptTerminal() {
                 window.Echo.leave(this.channelName);
                 this.channelName = null;
             }
+        },
+
+        // Called when the selected script changes. Unsubscribing (not just
+        // clearing `lines`) matters if the previous script was still
+        // running — otherwise its output-line events would keep arriving
+        // and silently repopulate the terminal for the newly-selected
+        // script, since the underlying execution isn't cancelled by merely
+        // switching selection.
+        clear() {
+            this.unsubscribe();
+            this.lines = [];
         },
 
         destroy() {

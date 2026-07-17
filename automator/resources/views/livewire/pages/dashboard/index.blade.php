@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Runner;
 use App\Models\ScheduledJob;
 use App\Models\ScriptDefinition;
 use App\Models\ScriptExecutionResult;
@@ -37,6 +38,18 @@ new #[Layout('layouts.app', ['title' => 'Dashboard'])] class extends Component
     public function activeSchedules(): int
     {
         return ScheduledJob::where('is_enabled', true)->count();
+    }
+
+    #[Computed]
+    public function runnerCount(): int
+    {
+        return Runner::count();
+    }
+
+    #[Computed]
+    public function onlineRunnerCount(): int
+    {
+        return Runner::where('status', 'online')->count();
     }
 
     #[Computed]
@@ -93,7 +106,7 @@ new #[Layout('layouts.app', ['title' => 'Dashboard'])] class extends Component
 }; ?>
 
 <div class="p-6 space-y-6">
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
         <a href="{{ route('scripts.index') }}" wire:navigate class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition">
             <p class="text-2xl font-semibold text-gray-900">{{ $this->scriptCount }}</p>
             <p class="text-xs text-gray-500 mt-1">Scripts</p>
@@ -113,6 +126,10 @@ new #[Layout('layouts.app', ['title' => 'Dashboard'])] class extends Component
         <a href="{{ route('jobs.index') }}" wire:navigate class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition">
             <p class="text-2xl font-semibold text-gray-900">{{ $this->activeSchedules }}</p>
             <p class="text-xs text-gray-500 mt-1">Active Schedules</p>
+        </a>
+        <a href="{{ route('settings.index', ['tab' => 'runners']) }}" wire:navigate class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition">
+            <p class="text-2xl font-semibold {{ $this->onlineRunnerCount > 0 ? 'text-gray-900' : 'text-red-600' }}">{{ $this->onlineRunnerCount }}/{{ $this->runnerCount }}</p>
+            <p class="text-xs text-gray-500 mt-1">Runners Online</p>
         </a>
     </div>
 

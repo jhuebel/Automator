@@ -37,12 +37,21 @@ WebSocket broadcasting server.
 ### Request flow: running a script
 
 1. A Livewire component (`pages/runner/index.blade.php`) creates a `ScriptExecutionResult`
-   row and calls `RunnerAssignmentService::assign()`.
-2. `RunnerAssignmentService` picks the least-busy online `Runner` whose tags satisfy any
-   required tags (`Runner::satisfiesTags()`), increments its `current_job_count`, and
-   stamps `runner_id` on the execution. If no runner is eligible, the execution is
-   immediately marked failed (`exit_code = -1`) — there is no queueing-and-waiting and no
-   silent retry.
+   row and calls `RunnerAssignmentService::assign()`, optionally passing a specific runner
+   the user picked from the "Run" panel's runner dropdown (defaults to "Auto").
+2. `RunnerAssignmentService` either uses that explicit runner (if given — this bypasses
+   tag matching entirely) or picks the least-busy online `Runner` whose tags satisfy any
+   required tags (`Runner::satisfiesTags()`). Either way, the runner must also report the
+   script's language as available in its last heartbeat (`Runner::supportsLanguage()`) —
+   a runner isn't eligible for a language it doesn't have installed, whether picked
+   automatically or explicitly. Eligible runners increment `current_job_count` and get
+   `runner_id` stamped on the execution. If no eligible runner exists (offline, at
+   capacity, missing tags, or missing the language), the execution is immediately marked
+   failed (`exit_code = -1`) with a message naming the specific reason — there is no
+   queueing-and-waiting and no silent retry. Scheduled jobs can likewise be pinned to a
+   specific runner via `ScheduledJob.preferred_runner_id`, set from the Scheduled Jobs UI;
+   both the Run Script and Scheduled Jobs runner-picker dropdowns only list
+   language-capable runners in the first place.
 3. A `JobAssigned` event is broadcast on that runner's private Reverb channel
    (`runner.{runnerId}`), delayed ~600ms via `BroadcastDelayedEvent` (a `ShouldQueue`
    wrapper) so the browser's own Echo subscription — established once the Livewire
@@ -100,6 +109,8 @@ Standalone Go module (`runner/`), one binary (`automator-runner`) with three sub
 | `pusher.go` | Minimal hand-rolled Pusher-protocol client for the Reverb WS connection |
 | `run.go` | Daemon entry point; heartbeat loop |
 | `runtimes.go` | Detects installed script runtimes (`bash`, `pwsh`, `python3`, `ansible-playbook`, `terraform`) at startup, reported with every heartbeat |
+| `version.go` | The runner binary's own `Version` const, bumped when shipping a runner-side change worth telling apart in the fleet |
+| `diskspace_linux.go` / `diskspace_windows.go` | `diskSpace()` — free/total bytes on the filesystem backing `os.TempDir()`, re-checked every heartbeat tick |
 | `executor.go` | Subprocess execution, output streaming/batching, timeout enforcement, cancellation bookkeeping |
 | `language.go` | Maps a script language to its OS-specific command (mirrors `ScriptLanguage::commandFor()` on the Laravel side, using `runtime.GOOS` instead of `PHP_OS_FAMILY`) |
 | `reporter.go` | Batches output lines (~250ms flush cadence) before POSTing them |

@@ -140,7 +140,7 @@ All under `auth:sanctum` middleware except `register`.
 | Method & path | Purpose | Body |
 |---|---|---|
 | `POST /api/runner/register` | Enrollment (see above) | see above |
-| `POST /api/runner/heartbeat` | Liveness + runtime inventory, every 15s | `{"runtimes": [{"name", "description", "available", "version", "path", "error"}, ...]}` |
+| `POST /api/runner/heartbeat` | Liveness + runtime/capability inventory, every 15s | `{"runtimes": [{"name", "description", "available", "version", "path", "error"}, ...], "version", "arch", "disk_free_bytes", "disk_total_bytes"}` |
 | `POST /api/runner/unregister` | Self-revoke: deletes the runner's own token and `Runner` row | none |
 | `POST /api/runner/executions/{execution}/output` | Stream output lines | `{"lines": [{"text", "is_error", "timestamp"}, ...]}` |
 | `POST /api/runner/executions/{execution}/finish` | Report completion | `{"exit_code": <int>}` |
@@ -161,8 +161,22 @@ output (reconstructed as `''` server-side).
 **Heartbeat runtime detection**: the runner probes for `bash`, `pwsh`, `python3`,
 `ansible-playbook`, and `terraform` on its own `PATH` once at process start
 (`runner/runtimes.go`), not on every heartbeat tick, and reports the same snapshot each
-time — the installed toolchain on a host doesn't change minute to minute. This is what
-powers the Settings → System Status runtime-by-runner matrix.
+time — the installed toolchain on a host doesn't change minute to minute. This powers
+both the Settings → System Status runtime-by-runner matrix and job assignment eligibility:
+`RunnerAssignmentService` (management-plane side) excludes any runner that hasn't
+reported the script's language as `available: true` from both automatic least-busy
+selection and the runner-picker dropdowns on the Run Script and Scheduled Jobs pages —
+see `App\Models\Runner::supportsLanguage()` and `App\Enums\ScriptLanguage::runtimeName()`
+for the name mapping (e.g. `PowerShell` ↔ the reported `"PowerShell Core"`).
+
+**Runner identity fields**: `version` (the `automator-runner` binary's own version,
+`runner/version.go`) and `arch` (`runtime.GOARCH`) are detected once at startup like the
+runtimes above — informational only, not currently used to gate assignment. `disk_free_bytes`/
+`disk_total_bytes` (free/total space on the filesystem backing `os.TempDir()`, where script
+content and Terraform working directories get written) are the one exception re-checked on
+every heartbeat tick rather than once, since disk usage can genuinely change between ticks
+in a way none of the other reported fields do. All four are purely diagnostic today — surfaced
+in the Settings → Runners expandable row — not scheduling inputs like `runtimes` is.
 
 **Finish semantics**: decrements `current_job_count`, sets `exit_code` + `completed_at`,
 writes an `AuditLog` entry (`Script.Executed`), and broadcasts `ScriptExecutionFinished`

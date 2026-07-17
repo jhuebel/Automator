@@ -68,7 +68,8 @@ Model accessors: `isRunning` (`completed_at === null`), `isSuccess` (`exit_code 
 | `script_id` | ulid, FK → `script_definitions`, `cascadeOnDelete` | |
 | `cron_expression` | string | standard 5-field cron, evaluated in UTC (`dragonmantank/cron-expression`) |
 | `is_enabled` | boolean | |
-| `required_runner_tags` | json, nullable | superset-match against a runner's `tags`; null/empty = any online runner with capacity |
+| `required_runner_tags` | json, nullable | superset-match against a runner's `tags`; null/empty = any online runner with capacity. Not currently exposed in the UI — superseded in practice by `preferred_runner_id` below, but still honored if set directly |
+| `preferred_runner_id` | ulid, FK → `runners`, nullable, `nullOnDelete` | pin this job to one specific runner (set from the Scheduled Jobs UI); when set, `RunnerAssignmentService::assign()` ignores `required_runner_tags` entirely and uses this runner if it's online with spare capacity, or fails the run with a clear "selected runner is offline or at capacity" message otherwise. Null/empty means auto-assign (least-busy online runner) |
 | `last_run_at` / `next_run_at` | timestamp, nullable | `next_run_at` indexed — `DispatchDueJobs` queries on it |
 | `last_exit_code` | integer, nullable | |
 | `current_execution_id` | ulid, nullable | the in-flight execution, if any; used to skip overlapping runs and to reconcile completion on the next scheduler tick |
@@ -81,8 +82,11 @@ Model accessors: `isRunning` (`completed_at === null`), `isSuccess` (`exit_code 
 | `name` | string, unique | operator-chosen at `register` time |
 | `hostname` | string, nullable | reported by the runner (`os.Hostname()`) |
 | `os` | string, nullable | `linux` or `windows` (`runtime.GOOS`) |
+| `version` | string, nullable | the `automator-runner` binary's own version (`runner/version.go`'s `Version` const), reported on every heartbeat — lets an admin spot a runner still running old code after a runner-side fix ships |
+| `arch` | string, nullable | CPU architecture (`runtime.GOARCH`, e.g. `amd64`/`arm64`), reported on every heartbeat |
+| `disk_free_bytes` / `disk_total_bytes` | unsigned bigint, nullable | free/total space on the filesystem backing the runner's temp directory (`os.TempDir()` — where script content and Terraform working directories are written), re-checked on every heartbeat since it can change between ticks unlike the other runner-identity fields |
 | `tags` | json | capability labels for routing (e.g. `["linux", "terraform"]`) |
-| `runtimes` | json | last-heartbeat snapshot of `[{name, description, available, version, path, error}]` — see `runner/runtimes.go` |
+| `runtimes` | json | last-heartbeat snapshot of `[{name, description, available, version, path, error}]` — see `runner/runtimes.go`. Drives both the Settings → System Status matrix and, via `Runner::supportsLanguage()` / `ScriptLanguage::runtimeName()`, which runners are eligible to run a script in a given language (a runner with no matching `available: true` entry is excluded from assignment and from the runner-picker dropdowns) |
 | `status` | string | `online` / `offline` (heartbeat-driven) / `disabled` (manually toggled from Settings → Runners, excluded from assignment same as offline but distinguished for operator intent); deleting the runner and its token is how an admin permanently revokes one |
 | `last_seen_at` | timestamp, nullable | bumped by `Runner::markSeen()` on every heartbeat *and* every other authenticated runner API call |
 | `current_job_count` | unsigned int, default 0 | incremented on assignment, decremented on `.../finish` |

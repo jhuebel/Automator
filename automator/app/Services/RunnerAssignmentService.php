@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ScriptLanguage;
 use App\Events\JobAssigned;
 use App\Events\JobCancelRequested;
 use App\Events\ScriptExecutionFinished;
@@ -13,16 +14,25 @@ use App\Models\ScriptExecutionResult;
 class RunnerAssignmentService
 {
     /**
-     * Assign a pending execution to the least-busy eligible runner and push
-     * the job to it. If no runner is eligible, the execution is marked
-     * failed immediately — there is no local fallback and no silent retry.
+     * Assign a pending execution to a runner and push the job to it. Only
+     * runners that reported the execution's language as available in their
+     * last heartbeat are eligible (Runner::supportsLanguage()). If
+     * $preferredRunnerId is given, that specific runner is used (and
+     * $requiredTags is ignored — an explicit pick overrides tag routing);
+     * otherwise the least-busy eligible runner is picked automatically. If
+     * no runner is eligible, the execution is marked failed immediately —
+     * there is no local fallback and no silent retry.
      */
-    public function assign(ScriptExecutionResult $result, ?array $requiredTags = null): void
+    public function assign(ScriptExecutionResult $result, ?array $requiredTags = null, ?string $preferredRunnerId = null): void
     {
-        $runner = $this->pickRunner($requiredTags);
+        $language = $result->language;
+
+        $runner = $preferredRunnerId
+            ? $this->pickSpecificRunner($preferredRunnerId, $language)
+            : $this->pickRunner($requiredTags, $language);
 
         if (! $runner) {
-            $this->failNoRunner($result, $requiredTags);
+            $this->failNoRunner($result, $requiredTags, $preferredRunnerId, $language);
 
             return;
         }
@@ -60,13 +70,13 @@ class RunnerAssignmentService
         }
     }
 
-    private function pickRunner(?array $requiredTags): ?Runner
+    private function pickRunner(?array $requiredTags, ScriptLanguage $language): ?Runner
     {
         return Runner::query()
             ->where('status', 'online')
             ->whereColumn('current_job_count', '<', 'max_concurrent_jobs')
             ->get()
-            ->filter(fn (Runner $runner) => $runner->satisfiesTags($requiredTags))
+            ->filter(fn (Runner $runner) => $runner->satisfiesTags($requiredTags) && $runner->supportsLanguage($language))
             ->sortBy([
                 ['current_job_count', 'asc'],
                 ['last_seen_at', 'desc'],
@@ -74,11 +84,40 @@ class RunnerAssignmentService
             ->first();
     }
 
-    private function failNoRunner(ScriptExecutionResult $result, ?array $requiredTags): void
+    private function pickSpecificRunner(string $runnerId, ScriptLanguage $language): ?Runner
     {
-        $message = empty($requiredTags)
-            ? 'No available runner is currently online.'
-            : 'No available runner matched the required tags: '.implode(', ', $requiredTags).'.';
+        $runner = Runner::query()
+            ->whereKey($runnerId)
+            ->where('status', 'online')
+            ->whereColumn('current_job_count', '<', 'max_concurrent_jobs')
+            ->first();
+
+        return $runner && $runner->supportsLanguage($language) ? $runner : null;
+    }
+
+    private function failNoRunner(ScriptExecutionResult $result, ?array $requiredTags, ?string $preferredRunnerId, ScriptLanguage $language): void
+    {
+        if ($preferredRunnerId) {
+            $runner = Runner::find($preferredRunnerId);
+            $message = match (true) {
+                ! $runner => 'The selected runner no longer exists.',
+                ! $runner->isOnline() || ! $runner->hasCapacity() => "The selected runner (\"{$runner->name}\") is offline or at capacity.",
+                ! $runner->supportsLanguage($language) => "The selected runner (\"{$runner->name}\") does not report {$language->label()} as available.",
+                default => "The selected runner (\"{$runner->name}\") is not available.",
+            };
+        } else {
+            $onlineWithCapacity = Runner::query()
+                ->where('status', 'online')
+                ->whereColumn('current_job_count', '<', 'max_concurrent_jobs')
+                ->get();
+            $tagMatches = $onlineWithCapacity->filter(fn (Runner $runner) => $runner->satisfiesTags($requiredTags));
+
+            $message = match (true) {
+                $onlineWithCapacity->isEmpty() => 'No available runner is currently online.',
+                $tagMatches->isEmpty() => 'No available runner matched the required tags: '.implode(', ', $requiredTags).'.',
+                default => "No available runner reports {$language->label()} as available.",
+            };
+        }
 
         $result->update([
             'exit_code' => -1,

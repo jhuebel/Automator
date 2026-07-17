@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Runner;
 use App\Models\ScheduledJob;
 use App\Models\ScriptDefinition;
 use Livewire\Attributes\Computed;
@@ -18,6 +19,8 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
 
     public string $cronExpression = '';
 
+    public string $preferredRunnerId = '';
+
     public bool $isEnabled = true;
 
     public ?string $confirmingDeleteId = null;
@@ -34,13 +37,29 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
     #[Computed]
     public function jobs()
     {
-        return ScheduledJob::with('script')->orderBy('name')->get();
+        return ScheduledJob::with('script', 'preferredRunner')->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function runners()
+    {
+        $language = $this->selectedScript?->language;
+
+        return Runner::orderBy('name')->get()
+            ->filter(fn (Runner $runner) => ! $language || $runner->supportsLanguage($language))
+            ->values();
     }
 
     #[Computed]
     public function scripts()
     {
         return ScriptDefinition::orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function selectedScript(): ?ScriptDefinition
+    {
+        return $this->scriptId ? ScriptDefinition::find($this->scriptId) : null;
     }
 
     #[Computed]
@@ -61,7 +80,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
     {
         $this->authorize('jobs.manage');
 
-        $this->reset(['editingId', 'name', 'scriptId', 'cronExpression']);
+        $this->reset(['editingId', 'name', 'scriptId', 'cronExpression', 'preferredRunnerId']);
         $this->isEnabled = true;
         $this->isEditing = true;
     }
@@ -75,6 +94,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
         $this->name = $job->name;
         $this->scriptId = $job->script_id;
         $this->cronExpression = $job->cron_expression;
+        $this->preferredRunnerId = $job->preferred_runner_id ?? '';
         $this->isEnabled = $job->is_enabled;
         $this->isEditing = true;
     }
@@ -87,6 +107,14 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
     public function applyPreset(string $cron): void
     {
         $this->cronExpression = $cron;
+    }
+
+    public function updatedScriptId(): void
+    {
+        // The previously-pinned runner may not support the newly-selected
+        // script's language — reset to Auto rather than silently keeping an
+        // invalid pick.
+        $this->preferredRunnerId = '';
     }
 
     public function save(): void
@@ -105,10 +133,22 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
             return;
         }
 
+        if (filled($this->preferredRunnerId)) {
+            $script = ScriptDefinition::find($validated['scriptId']);
+            $runner = Runner::find($this->preferredRunnerId);
+
+            if (! $runner || ! $runner->supportsLanguage($script->language)) {
+                $this->addError('preferredRunnerId', 'That runner does not report '.$script->language->label().' as available.');
+
+                return;
+            }
+        }
+
         $attributes = [
             'name' => $validated['name'],
             'script_id' => $validated['scriptId'],
             'cron_expression' => $validated['cronExpression'],
+            'preferred_runner_id' => filled($this->preferredRunnerId) ? $this->preferredRunnerId : null,
             'is_enabled' => $this->isEnabled,
         ];
 
@@ -180,7 +220,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Script</label>
-                    <select wire:model="scriptId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                    <select wire:model.live="scriptId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm">
                         <option value="">Select a script...</option>
                         @foreach ($this->scripts as $script)
                             <option value="{{ $script->id }}">{{ $script->name }}</option>
@@ -214,6 +254,23 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                 @endif
             </div>
 
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Runner</label>
+                <select wire:model="preferredRunnerId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm">
+                    <option value="">Auto (any online runner)</option>
+                    @foreach ($this->runners as $runner)
+                        <option value="{{ $runner->id }}">{{ $runner->name }} ({{ ucfirst($runner->status) }})</option>
+                    @endforeach
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Only runners that report the selected script's language as available are listed. Pin this job to a specific runner, or leave on Auto to use the least-busy online runner.</p>
+                @if ($this->selectedScript && $this->runners->isEmpty())
+                    <p class="text-sm text-amber-600 mt-1">
+                        No registered runner reports {{ $this->selectedScript->language->label() }} as available — this job will fail whenever it runs.
+                    </p>
+                @endif
+                @error('preferredRunnerId') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+            </div>
+
             <label class="flex items-center gap-2">
                 <input type="checkbox" wire:model="isEnabled" class="rounded border-gray-300" />
                 <span class="text-sm text-gray-700">Enabled</span>
@@ -233,6 +290,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Name</th>
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Script</th>
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Cron</th>
+                    <th class="px-4 py-2 text-left font-medium text-gray-500">Runner</th>
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Next Run</th>
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Last Run</th>
                     <th class="px-4 py-2 text-left font-medium text-gray-500">Enabled</th>
@@ -245,6 +303,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                         <td class="px-4 py-2 font-medium text-gray-900">{{ $job->name }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $job->script?->name ?? '—' }}</td>
                         <td class="px-4 py-2 text-gray-500 font-mono text-xs">{{ $job->cron_expression }}</td>
+                        <td class="px-4 py-2 text-gray-500">{{ $job->preferredRunner?->name ?? 'Auto' }}</td>
                         <td class="px-4 py-2 text-gray-500">{{ $job->next_run_at?->diffForHumans() ?? '—' }}</td>
                         <td class="px-4 py-2 text-gray-500">
                             @if ($job->last_run_at)
@@ -278,7 +337,7 @@ new #[Layout('layouts.app', ['title' => 'Scheduled Jobs'])] class extends Compon
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-6 text-center text-gray-500">No scheduled jobs yet.</td>
+                        <td colspan="8" class="px-4 py-6 text-center text-gray-500">No scheduled jobs yet.</td>
                     </tr>
                 @endforelse
             </tbody>

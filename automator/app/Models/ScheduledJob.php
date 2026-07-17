@@ -13,7 +13,7 @@ class ScheduledJob extends Model
     use HasUlids;
 
     protected $fillable = [
-        'name', 'script_id', 'cron_expression', 'is_enabled', 'required_runner_tags',
+        'name', 'script_id', 'cron_expression', 'is_enabled', 'required_runner_tags', 'preferred_runner_id',
         'last_run_at', 'next_run_at', 'last_exit_code', 'current_execution_id',
     ];
 
@@ -30,6 +30,11 @@ class ScheduledJob extends Model
     public function script(): BelongsTo
     {
         return $this->belongsTo(ScriptDefinition::class, 'script_id');
+    }
+
+    public function preferredRunner(): BelongsTo
+    {
+        return $this->belongsTo(Runner::class, 'preferred_runner_id');
     }
 
     protected function lastRunSucceeded(): Attribute

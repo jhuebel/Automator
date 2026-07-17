@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Enums\ScriptLanguage;
 use App\Models\Runner;
 use App\Models\RunnerEnrollmentToken;
 use Illuminate\Support\Facades\Auth;
@@ -14,10 +15,23 @@ class RunnerManagement extends Component
 
     public ?string $confirmingDeleteId = null;
 
+    public ?string $expandedId = null;
+
     #[Computed]
     public function runners()
     {
         return Runner::orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function languages(): array
+    {
+        return ScriptLanguage::cases();
+    }
+
+    public function toggleExpand(string $id): void
+    {
+        $this->expandedId = $this->expandedId === $id ? null : $id;
     }
 
     public function generateToken(): void

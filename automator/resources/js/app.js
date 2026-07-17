@@ -11,6 +11,7 @@ import codeEditor from './code-editor';
 import scriptTerminal from './script-terminal';
 import aiAssistant from './ai-assistant';
 import chartWidget from './chart-widget';
+import { ansiToHtml } from './ansi';
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('codeEditor', codeEditor);
@@ -18,4 +19,5 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('aiAssistant', aiAssistant);
     window.Alpine.data('chartWidget', chartWidget);
     window.Alpine.store('help', { open: false });
+    window.Alpine.magic('ansiToHtml', () => ansiToHtml);
 });

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"time"
 )
 
@@ -32,23 +33,34 @@ func runDaemon(args []string) {
 	client.runWithReconnect()
 }
 
-// heartbeatLoop reports liveness every 15s. Runtime availability is detected
-// once at startup rather than on every tick — the installed toolchain on a
-// runner host doesn't change minute to minute, and shelling out to five
-// version checks every 15s would be wasteful.
+// heartbeatLoop reports liveness every 15s. Runtime availability, version,
+// and CPU architecture are detected once at startup rather than on every
+// tick — none of them change minute to minute for a running process, and
+// shelling out to five version checks every 15s would be wasteful. Disk
+// space is re-checked on every tick, since a long-running script (or
+// several) can genuinely fill up the runner's temp directory over time.
 func heartbeatLoop(api *apiClient) {
 	runtimes := detectRuntimes()
+	arch := runtime.GOARCH
 
-	if err := api.heartbeat(runtimes); err != nil {
-		log.Printf("heartbeat failed: %v", err)
+	send := func() {
+		free, total, err := diskSpace(os.TempDir())
+		if err != nil {
+			log.Printf("disk space check failed: %v", err)
+		}
+
+		info := heartbeatInfo{Version: Version, Arch: arch, DiskFreeBytes: free, DiskTotalBytes: total}
+		if err := api.heartbeat(runtimes, info); err != nil {
+			log.Printf("heartbeat failed: %v", err)
+		}
 	}
+
+	send()
 
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		if err := api.heartbeat(runtimes); err != nil {
-			log.Printf("heartbeat failed: %v", err)
-		}
+		send()
 	}
 }

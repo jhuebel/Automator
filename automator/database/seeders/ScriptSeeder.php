@@ -164,6 +164,102 @@ class ScriptSeeder extends Seeder
                     }
                     POWERSHELL,
             ],
+            [
+                'name' => 'ANSI Color Palette (Bash)',
+                'description' => 'Prints the standard 16-color ANSI palette plus text styles — useful for checking that the output terminal renders color correctly',
+                'language' => ScriptLanguage::Bash,
+                'tags' => ['demo', 'ansi', 'colors'],
+                'content' => <<<'BASH'
+                    #!/bin/bash
+                    echo "=== Standard Foreground Colors (30-37) ==="
+                    for i in 30 31 32 33 34 35 36 37; do
+                        printf "\033[%sm Color %s \033[0m" "$i" "$i"
+                    done
+                    echo ""
+                    echo ""
+
+                    echo "=== Bright Foreground Colors (90-97) ==="
+                    for i in 90 91 92 93 94 95 96 97; do
+                        printf "\033[%sm Color %s \033[0m" "$i" "$i"
+                    done
+                    echo ""
+                    echo ""
+
+                    echo "=== Background Colors (40-47) ==="
+                    for i in 40 41 42 43 44 45 46 47; do
+                        printf "\033[%sm    \033[0m" "$i"
+                    done
+                    echo ""
+                    echo ""
+
+                    echo "=== Text Styles ==="
+                    printf "\033[1mBold\033[0m  "
+                    printf "\033[2mDim\033[0m  "
+                    printf "\033[3mItalic\033[0m  "
+                    printf "\033[4mUnderline\033[0m  "
+                    printf "\033[5mBlink\033[0m  "
+                    printf "\033[7mReverse\033[0m\n"
+                    BASH,
+            ],
+            [
+                'name' => 'ANSI Color Palette (PowerShell)',
+                'description' => 'Prints the standard 16-color ANSI palette plus text styles via $PSStyle (PowerShell 7.2+) — useful for checking that the output terminal renders color correctly',
+                'language' => ScriptLanguage::PowerShell,
+                'tags' => ['demo', 'ansi', 'colors'],
+                'content' => <<<'POWERSHELL'
+                    $colors = 'Black', 'Red', 'Green', 'Yellow', 'Blue', 'Magenta', 'Cyan', 'White'
+
+                    Write-Host "=== Standard Foreground Colors ==="
+                    foreach ($name in $colors) {
+                        Write-Host "$($PSStyle.Foreground.$name) $name $($PSStyle.Reset)" -NoNewline
+                    }
+                    Write-Host "`n"
+
+                    Write-Host "=== Bright Foreground Colors ==="
+                    foreach ($name in $colors) {
+                        $bright = "Bright$name"
+                        Write-Host "$($PSStyle.Foreground.$bright) $name $($PSStyle.Reset)" -NoNewline
+                    }
+                    Write-Host "`n"
+
+                    Write-Host "=== Background Colors ==="
+                    foreach ($name in $colors) {
+                        Write-Host "$($PSStyle.Background.$name)    $($PSStyle.Reset)" -NoNewline
+                    }
+                    Write-Host "`n"
+
+                    Write-Host "=== Text Styles ==="
+                    Write-Host "$($PSStyle.Bold)Bold$($PSStyle.BoldOff)  " -NoNewline
+                    Write-Host "$($PSStyle.Dim)Dim$($PSStyle.DimOff)  " -NoNewline
+                    Write-Host "$($PSStyle.Italic)Italic$($PSStyle.ItalicOff)  " -NoNewline
+                    Write-Host "$($PSStyle.Underline)Underline$($PSStyle.UnderlineOff)  " -NoNewline
+                    Write-Host "$($PSStyle.Blink)Blink$($PSStyle.BlinkOff)  " -NoNewline
+                    Write-Host "$($PSStyle.Reverse)Reverse$($PSStyle.ReverseOff)"
+                    POWERSHELL,
+            ],
+            [
+                'name' => 'Colored Status Report (Bash)',
+                'description' => 'A mock health-check report using semantic color (green/yellow/red) — a realistic example of why ANSI rendering matters, not just a color chart',
+                'language' => ScriptLanguage::Bash,
+                'tags' => ['demo', 'ansi', 'colors', 'monitoring'],
+                'content' => <<<'BASH'
+                    #!/bin/bash
+                    GREEN='\033[32m'
+                    RED='\033[31m'
+                    YELLOW='\033[33m'
+                    BOLD='\033[1m'
+                    RESET='\033[0m'
+
+                    echo -e "${BOLD}=== Service Health Check ===${RESET}"
+                    echo -e "${GREEN}[PASS]${RESET} API gateway responding (200 OK, 42ms)"
+                    echo -e "${GREEN}[PASS]${RESET} Database connection healthy"
+                    echo -e "${YELLOW}[WARN]${RESET} Cache hit rate below target (68%, target 80%)"
+                    echo -e "${RED}[FAIL]${RESET} Background queue worker not responding"
+                    echo -e "${GREEN}[PASS]${RESET} Disk usage within limits (54% used)"
+                    echo ""
+                    echo -e "${BOLD}Summary:${RESET} 3 passed, 1 warning, 1 failed"
+                    BASH,
+            ],
         ];
     }
 }

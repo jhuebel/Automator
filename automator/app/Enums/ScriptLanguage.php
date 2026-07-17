@@ -47,6 +47,23 @@ enum ScriptLanguage: string
     }
 
     /**
+     * The runtime name a runner reports in its heartbeat for this language
+     * (see runner/runtimes.go's runtimeDefs) — used to check whether a given
+     * Runner actually has the interpreter/tool installed before assigning it
+     * a script in this language.
+     */
+    public function runtimeName(): string
+    {
+        return match ($this) {
+            self::Bash => 'Bash',
+            self::PowerShell => 'PowerShell Core',
+            self::Python => 'Python 3',
+            self::Ansible => 'Ansible',
+            self::Terraform => 'Terraform',
+        };
+    }
+
+    /**
      * CodeMirror language mode name used by the editor.js integration.
      */
     public function codeMirrorMode(): string

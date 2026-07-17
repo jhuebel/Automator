@@ -109,15 +109,22 @@ runtimes) as available.
 
 1. Select a script from the list on the left.
 2. Fill in any variable values (pre-populated with defaults).
-3. Click **Run**.
+3. Optionally pick a specific runner from the dropdown next to Run — defaults to
+   **Auto (least busy)**, which picks the least-busy online runner automatically. Only
+   runners that reported the script's language as installed (in their last heartbeat) are
+   listed; if none have, the dropdown is empty and a warning explains why.
+4. Click **Run**.
 
 Output streams line-by-line in real time. Click **Cancel** to terminate the process early. All runs — successful or not — are saved to **History**.
 
 Exit code `0` = success; any other value = failure.
 
-Scripts run on whichever runner is assigned the job (least-busy among online runners,
-or a runner matching the job's required tags), as that runner's OS user, and inherit its
-environment variables — not the management plane's.
+Scripts run on whichever runner is assigned the job — the one you picked, or
+automatically (least-busy among online runners that support the script's language) — as
+that runner's OS user, inheriting its environment variables, not the management plane's.
+If the runner you picked is offline, at capacity, or (for a script you ran outside the
+picker, e.g. from a scheduled job) doesn't have the required language installed, the
+execution fails immediately with a clear error rather than waiting.
 
 ## Job Scheduler
 
@@ -125,6 +132,11 @@ Scheduled jobs run scripts automatically on a cron schedule. A scheduler tick ru
 
 - **Enable / Disable** — toggle a job without deleting it.
 - **Run Now** — trigger a job immediately outside its schedule.
+- **Runner** — pin a job to a specific runner, or leave on **Auto** to use the least-busy
+  online runner at dispatch time. The picker only lists runners that report the selected
+  script's language as installed. If the pinned runner is offline, at capacity, or stops
+  reporting that language, that run fails immediately with a clear error instead of
+  waiting or retrying.
 - Jobs that are still running when their next fire time arrives are skipped to avoid overlapping executions.
 - Scheduled jobs use each script's variable default values.
 

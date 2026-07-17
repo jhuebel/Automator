@@ -78,6 +78,10 @@ class RunnerController extends Controller
             'runtimes.*.version' => 'nullable|string',
             'runtimes.*.path' => 'nullable|string',
             'runtimes.*.error' => 'nullable|string',
+            'version' => 'nullable|string|max:50',
+            'arch' => 'nullable|string|max:50',
+            'disk_free_bytes' => 'nullable|integer|min:0',
+            'disk_total_bytes' => 'nullable|integer|min:0',
         ]);
 
         $runner = $request->user();
@@ -85,6 +89,13 @@ class RunnerController extends Controller
         if (array_key_exists('runtimes', $validated)) {
             $runner->runtimes = $validated['runtimes'];
         }
+
+        $runner->forceFill([
+            'version' => $validated['version'] ?? null,
+            'arch' => $validated['arch'] ?? null,
+            'disk_free_bytes' => $validated['disk_free_bytes'] ?? null,
+            'disk_total_bytes' => $validated['disk_total_bytes'] ?? null,
+        ]);
 
         $runner->markSeen();
 
