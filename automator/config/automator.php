@@ -2,7 +2,7 @@
 
 return [
 
-    'version' => '2.5.0',
+    'version' => '2.5.1',
 
     'default_admin' => [
         'username' => env('AUTOMATOR_ADMIN_USERNAME', 'admin'),
